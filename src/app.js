@@ -261,7 +261,7 @@ function renderQuestion() {
       const row = document.createElement('div');
       row.className = 'breakdown-item';
       const info = document.createElement('div');
-      info.innerHTML = `<strong>${piece.thai}</strong><div>${piece.transliteration}</div>`;
+      info.innerHTML = `<strong>${piece.thai}</strong>`;
       const play = document.createElement('button');
       play.className = 'ghost-button';
       play.textContent = '播放';
@@ -357,7 +357,7 @@ function updateTroubleList() {
   itemsWithStats.forEach(({ item, stats, accuracy }) => {
     const li = document.createElement('li');
     const percent = Math.round(accuracy * 100);
-    li.textContent = `${item.thai} (${item.transliteration}) · ${percent}% 正確 · 錯 ${stats.incorrect}`;
+    li.textContent = `${item.thai} · ${percent}% 正確 · 錯 ${stats.incorrect}`;
     li.addEventListener('click', () => goToItem(item.id, true));
     elements.troubleList.appendChild(li);
   });
@@ -395,7 +395,7 @@ function renderAlphabetList() {
       checkbox.addEventListener('change', (event) => setManualFlag(item.id, event.target.checked, row));
 
       const text = document.createElement('div');
-      text.innerHTML = `<strong>${item.thai}</strong><div>${item.transliteration}</div>`;
+      text.innerHTML = `<strong>${item.thai}</strong>`;
 
       info.append(checkbox, text);
 
@@ -439,7 +439,7 @@ function updateManualList() {
     entry.className = 'manual-entry';
 
     const info = document.createElement('div');
-    info.innerHTML = `<strong>${item.thai}</strong><div>${item.transliteration}</div>`;
+    info.innerHTML = `<strong>${item.thai}</strong>`;
 
     const actions = document.createElement('div');
     actions.className = 'manual-actions';

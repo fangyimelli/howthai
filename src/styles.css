@@ -347,6 +347,14 @@ button.primary {
   border: 1px solid var(--border);
   border-radius: 18px;
   font-weight: 500;
+  color: var(--text);
+  font-size: 1rem;
+  line-height: 1.4;
+}
+
+.option-button:hover:not(:disabled) {
+  border-color: rgba(251, 191, 36, 0.7);
+  background: rgba(251, 191, 36, 0.08);
 }
 
 .option-button.correct {
@@ -438,6 +446,47 @@ button.primary {
   width: 0%;
   background: linear-gradient(90deg, var(--accent), var(--success));
   transition: width 300ms ease;
+}
+
+.stage-star {
+  padding: 0.4rem 0.75rem;
+  border-radius: 12px;
+  border: 1px dashed rgba(255, 255, 255, 0.2);
+  font-size: 0.95rem;
+  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+.stage-star::before {
+  content: '★';
+  color: rgba(248, 250, 252, 0.4);
+  font-size: 1.3rem;
+}
+
+.stage-star[data-active='true'] {
+  color: var(--accent);
+  border-color: rgba(251, 191, 36, 0.65);
+  background: rgba(251, 191, 36, 0.08);
+  animation: star-pop 0.8s ease;
+}
+
+.stage-star[data-active='true']::before {
+  color: var(--accent);
+}
+
+@keyframes star-pop {
+  0% {
+    transform: scale(0.9);
+  }
+  60% {
+    transform: scale(1.08);
+  }
+  100% {
+    transform: scale(1);
+  }
 }
 
 .meter-value {
@@ -548,12 +597,62 @@ button.primary {
 }
 
 .trouble-glyph {
-  font-size: 1.75rem;
+  font-size: 2.2rem;
+  font-weight: 700;
 }
 
 .trouble-meta p {
   margin: 0;
+  font-size: 1rem;
+}
+
+.daily-widget {
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.02);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  transition: border-color 200ms ease, background 200ms ease;
+}
+
+.daily-widget[data-complete='true'] {
+  border-color: rgba(52, 211, 153, 0.6);
+  background: rgba(52, 211, 153, 0.08);
+}
+
+.daily-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.daily-streak {
+  font-size: 0.95rem;
+  color: var(--accent);
+}
+
+.daily-meter {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.daily-accuracy {
+  margin: 0;
+  color: var(--muted);
+}
+
+.hero-reminder {
+  margin: 0;
+  padding: 0.35rem 0.75rem;
+  background: rgba(251, 191, 36, 0.15);
+  border-radius: 999px;
+  color: var(--accent);
   font-size: 0.9rem;
+  animation: hero-pop 0.7s ease;
 }
 
 .details-grid {

@@ -15,6 +15,7 @@
         <div class="hero-cta">
           <button id="hero-cta" class="primary-button">開始練習</button>
           <p id="hero-hint" class="hero-hint">準備好闖關，先從子音開始！</p>
+          <p id="daily-reminder" class="hero-reminder" hidden>今天目標：做完 1 關子音，或 30 題隨機練習</p>
         </div>
       </div>
       <div class="hero-art" aria-hidden="true">
@@ -68,7 +69,7 @@
               <h3>本關進度</h3>
               <p id="stage-subtitle" class="stage-subtitle">子音關卡</p>
             </div>
-            <button id="drill-unfamiliar" class="pill-button">專練不熟題</button>
+            <button id="drill-unfamiliar" class="pill-button">啟動修羅場模式</button>
           </div>
           <div class="stage-meter">
             <div class="meter-label">正確率 80% 達標</div>
@@ -76,6 +77,7 @@
               <div class="meter-fill" id="accuracy-fill"></div>
             </div>
             <p id="accuracy-label" class="meter-value">0% / 80%</p>
+            <div class="stage-star" id="stage-star" data-active="false">集滿條件就能點亮星星</div>
           </div>
           <div class="combo-line">
             <p>連擊</p>
@@ -90,6 +92,20 @@
           <section class="trouble-highlight">
             <h4>今天最調皮的字母 😈</h4>
             <ol id="trouble-list"></ol>
+          </section>
+          <section class="daily-widget" id="daily-widget">
+            <div class="daily-header">
+              <h4>每日進步</h4>
+              <span id="daily-streak" class="daily-streak">你已連續練習 0 天 🔥</span>
+            </div>
+            <p class="section-hint">今日目標：完成 30 題／正確率 ≥ 70%</p>
+            <div class="daily-meter">
+              <div class="meter-track">
+                <div class="meter-fill" id="daily-meter-fill"></div>
+              </div>
+              <p id="daily-meter-label" class="meter-value">已完成 0 / 30 題</p>
+            </div>
+            <p id="daily-accuracy-label" class="daily-accuracy">正確率 0% / 70%</p>
           </section>
         </aside>
       </section>
@@ -122,9 +138,9 @@
           <p class="section-hint" id="unfamiliar-count">目前沒有不熟項目，保持加油！</p>
           <div id="unfamiliar-pool" class="unfamiliar-pool"></div>
           <div class="page-actions">
-            <button id="start-unfamiliar-practice" class="primary-button">專練不熟題</button>
+            <button id="start-unfamiliar-practice" class="primary-button">進入修羅場模式</button>
           </div>
-          <p class="section-hint">錯題會自動加入。連續答對 5 次就會從排行與資料庫中消失。</p>
+          <p class="section-hint">錯題或勾選都會進入修羅場。專練時同一題連對 3 次，就會自動移出不熟清單與排行。</p>
         </details>
 
         <details>

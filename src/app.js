@@ -9,6 +9,7 @@ const stageFlow = [
 const elements = {
   heroCta: document.getElementById('hero-cta'),
   heroHint: document.getElementById('hero-hint'),
+  dailyReminder: document.getElementById('daily-reminder'),
   card: document.getElementById('learning-card'),
   categoryLabel: document.getElementById('category-label'),
   phoneticLabel: document.getElementById('phonetic-label'),
@@ -22,6 +23,7 @@ const elements = {
   stageSubtitle: document.getElementById('stage-subtitle'),
   accuracyFill: document.getElementById('accuracy-fill'),
   accuracyLabel: document.getElementById('accuracy-label'),
+  stageStar: document.getElementById('stage-star'),
   comboValue: document.getElementById('combo-value'),
   stageRoadmap: document.getElementById('stage-roadmap'),
   stageCelebration: document.getElementById('stage-celebration'),
@@ -41,12 +43,21 @@ const elements = {
   heroDeviceEmoji: document.getElementById('hero-device-emoji'),
   heroDeviceScript: document.getElementById('hero-device-script'),
   heroFloatingMain: document.getElementById('hero-floating-main'),
-  drillUnfamiliar: document.getElementById('drill-unfamiliar')
+  drillUnfamiliar: document.getElementById('drill-unfamiliar'),
+  dailyMeterFill: document.getElementById('daily-meter-fill'),
+  dailyMeterLabel: document.getElementById('daily-meter-label'),
+  dailyAccuracyLabel: document.getElementById('daily-accuracy-label'),
+  dailyStreak: document.getElementById('daily-streak'),
+  dailyWidget: document.getElementById('daily-widget')
 };
 
 const localStorageKey = 'thai-learning-progress';
 const manualStorageKey = 'thai-learning-manual-unfamiliar';
 const stageStorageKey = 'thai-learning-stage-gate';
+const dailyStorageKey = 'thai-learning-daily-tracker';
+const dailyGoal = { attempts: 30, accuracy: 70 };
+const dailyStorageKey = 'thai-learning-daily-tracker';
+const dailyGoal = { attempts: 30, accuracy: 70 };
 const categoryOrder = Object.fromEntries(categories.map((category, index) => [category.id, index]));
 
 const defaultCategory = stageFlow[0].categories[0];
@@ -60,16 +71,21 @@ const state = {
   progress: loadProgress(),
   manualUnfamiliar: loadManualUnfamiliar(),
   stageGate: loadStageGate(),
+  dailyProgress: loadDailyProgress(),
   activeFilter: defaultCategory,
   mode: 'gate',
   customPool: [],
   customLabel: '',
   customStats: { attempts: 0, correct: 0, consecutive: 0 },
   customStartSnapshot: null,
+  customModeType: 'custom',
+  unfamiliarSessionStreaks: {},
   troubleIds: [],
   previousCombo: 0,
   recentUnlock: null
 };
+
+let dailyReminderTimeout = null;
 
 function loadManualUnfamiliar() {
   try {
@@ -141,6 +157,63 @@ function saveStageGate() {
   }
 }
 
+function getTodayKey() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function daysBetween(previous, current) {
+  if (!previous || !current) return Infinity;
+  const prevTime = new Date(previous).setHours(0, 0, 0, 0);
+  const currentTime = new Date(current).setHours(0, 0, 0, 0);
+  return Math.round((currentTime - prevTime) / (1000 * 60 * 60 * 24));
+}
+
+function createDailyProgress() {
+  return {
+    date: getTodayKey(),
+    attempts: 0,
+    correct: 0,
+    streak: 0,
+    lastPracticeDate: null,
+    reminderDate: null
+  };
+}
+
+function normalizeDailyProgress(progress) {
+  const today = getTodayKey();
+  const normalized = {
+    ...createDailyProgress(),
+    ...(progress ?? {})
+  };
+  if (normalized.date !== today) {
+    normalized.date = today;
+    normalized.attempts = 0;
+    normalized.correct = 0;
+  }
+  if (typeof normalized.streak !== 'number' || Number.isNaN(normalized.streak)) {
+    normalized.streak = 0;
+  }
+  return normalized;
+}
+
+function loadDailyProgress() {
+  try {
+    const cached = localStorage.getItem(dailyStorageKey);
+    return normalizeDailyProgress(cached ? JSON.parse(cached) : createDailyProgress());
+  } catch (error) {
+    console.warn('無法讀取每日目標紀錄，使用預設值', error);
+    return createDailyProgress();
+  }
+}
+
+function saveDailyProgress() {
+  try {
+    localStorage.setItem(dailyStorageKey, JSON.stringify(state.dailyProgress));
+  } catch (error) {
+    console.warn('無法儲存每日目標紀錄', error);
+  }
+}
+
 function renderCustomIndicator() {
   if (!elements.customIndicator) return;
   if (state.mode !== 'custom') {
@@ -152,10 +225,101 @@ function renderCustomIndicator() {
     ? Math.round((state.customStats.correct / state.customStats.attempts) * 100)
     : 0;
   elements.customIndicator.dataset.active = 'true';
-  elements.customIndicator.textContent = `${state.customLabel || '自選練習中'} · 正確率 ${accuracy}% · 連續正確 ${state.customStats.consecutive}`;
+  const prefix = state.customModeType === 'unfamiliar' ? '修羅場模式' : state.customLabel || '自選練習中';
+  elements.customIndicator.textContent = `${prefix} · 正確率 ${accuracy}% · 連續正確 ${state.customStats.consecutive}`;
 }
 
-function startCustomSession(itemIds, label = '自選練習') {
+function renderDailyWidget() {
+  if (!elements.dailyWidget) return;
+  const { attempts, correct, streak } = state.dailyProgress;
+  const accuracy = attempts ? Math.round((correct / attempts) * 100) : 0;
+  const progressPercent = Math.min((attempts / dailyGoal.attempts) * 100, 100);
+  if (elements.dailyMeterFill) {
+    elements.dailyMeterFill.style.width = `${progressPercent}%`;
+  }
+  if (elements.dailyMeterLabel) {
+    elements.dailyMeterLabel.textContent = `已完成 ${attempts} / ${dailyGoal.attempts} 題`;
+  }
+  if (elements.dailyAccuracyLabel) {
+    elements.dailyAccuracyLabel.textContent = `正確率 ${accuracy}% / ${dailyGoal.accuracy}%`;
+  }
+  if (elements.dailyStreak) {
+    elements.dailyStreak.textContent = `你已連續練習 ${streak} 天 🔥`;
+  }
+  const complete = attempts >= dailyGoal.attempts && accuracy >= dailyGoal.accuracy;
+  elements.dailyWidget.dataset.complete = complete ? 'true' : 'false';
+}
+
+function updateDailyProgress(isCorrect) {
+  const today = getTodayKey();
+  if (state.dailyProgress.date !== today) {
+    state.dailyProgress.date = today;
+    state.dailyProgress.attempts = 0;
+    state.dailyProgress.correct = 0;
+  }
+  if (state.dailyProgress.lastPracticeDate !== today) {
+    const diff = daysBetween(state.dailyProgress.lastPracticeDate, today);
+    if (!state.dailyProgress.lastPracticeDate) {
+      state.dailyProgress.streak = 1;
+    } else if (diff === 1) {
+      state.dailyProgress.streak += 1;
+    } else {
+      state.dailyProgress.streak = 1;
+    }
+    state.dailyProgress.lastPracticeDate = today;
+  }
+  state.dailyProgress.attempts += 1;
+  if (isCorrect) {
+    state.dailyProgress.correct += 1;
+  }
+  saveDailyProgress();
+  renderDailyWidget();
+}
+
+function maybeShowDailyReminder() {
+  if (!elements.dailyReminder) return;
+  const today = getTodayKey();
+  if (state.dailyProgress.reminderDate === today) return;
+  state.dailyProgress.reminderDate = today;
+  saveDailyProgress();
+  elements.dailyReminder.hidden = false;
+  elements.dailyReminder.classList.add('show');
+  clearTimeout(dailyReminderTimeout);
+  dailyReminderTimeout = setTimeout(() => {
+    if (elements.dailyReminder) {
+      elements.dailyReminder.hidden = true;
+      elements.dailyReminder.classList.remove('show');
+    }
+  }, 5500);
+}
+
+function handleUnfamiliarModeResult(item, isCorrect) {
+  if (state.customModeType !== 'unfamiliar') return null;
+  if (!state.unfamiliarSessionStreaks[item.id]) {
+    state.unfamiliarSessionStreaks[item.id] = 0;
+  }
+  if (isCorrect) {
+    state.unfamiliarSessionStreaks[item.id] += 1;
+    if (state.unfamiliarSessionStreaks[item.id] >= 3) {
+      state.unfamiliarSessionStreaks[item.id] = 0;
+      const manualRemoved = state.manualUnfamiliar.has(item.id);
+      if (manualRemoved) {
+        setManualFlag(item.id, false);
+      }
+      const stats = getStats(item.id);
+      stats.streak = Math.max(stats.streak ?? 0, 5);
+      state.progress[item.id] = stats;
+      saveProgress();
+      updateTroubleList();
+      return { removed: true, manualRemoved };
+    }
+  } else {
+    state.unfamiliarSessionStreaks[item.id] = 0;
+  }
+  return null;
+}
+
+function startCustomSession(itemIds, label = '自選練習', options = {}) {
   const pool = Array.from(new Set(itemIds))
     .map((id) => itemMap[id])
     .filter(Boolean);
@@ -167,7 +331,10 @@ function startCustomSession(itemIds, label = '自選練習') {
   state.customPool = pool.map((item) => item.id);
   state.customLabel = label;
   state.customStats = { attempts: 0, correct: 0, consecutive: 0 };
-  state.customStartSnapshot = new Set(state.troubleIds);
+  const snapshotIds = Array.isArray(options.snapshotIds) ? options.snapshotIds : null;
+  state.customStartSnapshot = snapshotIds ? new Set(snapshotIds) : null;
+  state.customModeType = options.modeType || 'custom';
+  state.unfamiliarSessionStreaks = {};
   state.stage = 'quiz';
   state.showBreakdown = false;
   state.answerRevealed = false;
@@ -185,21 +352,31 @@ function endCustomSession(completed = false) {
   state.customPool = [];
   state.customLabel = '';
   state.customStats = { attempts: 0, correct: 0, consecutive: 0 };
-  const snapshot = state.customStartSnapshot;
+  const snapshot = state.customStartSnapshot ? new Set(state.customStartSnapshot) : null;
   state.customStartSnapshot = null;
+  state.unfamiliarSessionStreaks = {};
+  const modeType = state.customModeType;
+  state.customModeType = 'custom';
   renderCustomIndicator();
   renderModeTabs();
   ensureCurrentItemAllowed();
   updateHeroCta();
   if (completed) {
-    const removed = snapshot
-      ? Array.from(snapshot).filter((id) => !state.troubleIds.includes(id)).length
-      : 0;
-    if (removed > 0) {
+    const currentSet = new Set(gatherUnfamiliarIds());
+    const removed = snapshot ? Array.from(snapshot).filter((id) => !currentSet.has(id)).length : 0;
+    if (modeType === 'unfamiliar') {
+      if (removed > 0) {
+        showFeedback(`你剛剛修掉了 ${removed} 題不熟字母 👏`, true);
+      } else {
+        showFeedback('修羅場完成！繼續闖關累積星星。', true);
+      }
+    } else if (removed > 0) {
       showFeedback(`不熟題已消除 ${removed} 題！`, true);
     } else {
       showFeedback('自選練習達標，返回闖關模式！', true);
     }
+  } else if (modeType === 'unfamiliar') {
+    showFeedback('修羅場暫停，隨時再回來收拾不熟題。', false, { flash: false });
   }
 }
 
@@ -389,8 +566,8 @@ function renderStageProgress() {
   if (elements.accuracyLabel) {
     elements.accuracyLabel.textContent = `${accuracy}% / 80%`;
   }
+  const combo = stats?.consecutive ?? 0;
   if (elements.comboValue) {
-    const combo = stats?.consecutive ?? 0;
     elements.comboValue.textContent = `連續答對 ${combo} / 10 題 🔥`;
     elements.comboValue.classList.remove('combo-pop');
     if (combo > state.previousCombo) {
@@ -398,6 +575,11 @@ function renderStageProgress() {
       setTimeout(() => elements.comboValue?.classList.remove('combo-pop'), 500);
     }
     state.previousCombo = combo;
+  }
+  if (elements.stageStar) {
+    const starReady = stats?.attempts ? accuracy >= 80 && combo >= 10 : false;
+    elements.stageStar.dataset.active = starReady ? 'true' : 'false';
+    elements.stageStar.textContent = starReady ? '本關星星 GET！前往下一關' : '集滿條件就能點亮星星';
   }
 
   if (elements.stageRoadmap) {
@@ -506,11 +688,12 @@ function recordResult(item, isCorrect) {
   } else {
     stats.incorrect += 1;
     stats.streak = 0;
-    stats.score = Math.max(stats.score - 1, 0);
+  stats.score = Math.max(stats.score - 1, 0);
   }
   state.progress[item.id] = stats;
   saveProgress();
   updateTroubleList();
+  updateDailyProgress(isCorrect);
   if (state.mode === 'custom') {
     updateCustomStats(isCorrect);
   } else {
@@ -761,15 +944,27 @@ function handleOption(selectedText, button) {
   revealAnswer(true);
   recordResult(item, isCorrect);
   const stats = getStats(item.id);
+  const unfamiliarRemoval = handleUnfamiliarModeResult(item, isCorrect);
+  const inUnfamiliarMode = state.mode === 'custom' && state.customModeType === 'unfamiliar';
 
   if (isCorrect) {
-    showFeedback(`✔ 答對！連續 ${stats.streak ?? 0} 題`, true);
+    let subtext = '';
+    if (inUnfamiliarMode) {
+      subtext = '修羅場連擊中，繼續把不熟題打包！';
+    }
+    if (unfamiliarRemoval?.removed) {
+      const extra = `${item.thai} 連對 3 次，已從不熟清單移除！`;
+      subtext = subtext ? `${subtext} · ${extra}` : extra;
+    }
+    showFeedback(`✔ 答對！連續 ${stats.streak ?? 0} 題`, true, { subtext: subtext || undefined });
     state.promptOverride = '';
     state.showBreakdown = false;
     setTimeout(() => selectNextItem(), 1000);
   } else {
     showFeedback(`✘ 答錯，正確答案是 ${item.transliteration}`, false, {
-      subtext: '已加入不熟清單，稍後會優先抽到。'
+      subtext: inUnfamiliarMode
+        ? '修羅場會再出現這題，重播音檔反覆記起來！'
+        : '已加入不熟清單，稍後會優先抽到。'
     });
     if (item.mnemonicQuestion) {
       state.stage = 'mnemonic';
@@ -1021,7 +1216,7 @@ function renderUnfamiliarPool() {
         const needed = Math.max(0, 5 - (stats.streak ?? 0));
         const reminder = document.createElement('span');
         reminder.className = 'reminder-text';
-        reminder.textContent = `再連對 ${needed} 題即可自動移除`;
+        reminder.textContent = `再連對 ${needed} 題（或修羅場連對 3 題）即可自動移除`;
         info.appendChild(reminder);
       }
 
@@ -1076,6 +1271,8 @@ function resetProgress() {
   state.stageGate.currentStage = determineCurrentStage(state.stageGate.stats);
   state.recentUnlock = null;
   state.previousCombo = 0;
+  state.dailyProgress = createDailyProgress();
+  saveDailyProgress();
   saveStageGate();
   updateTroubleList();
   renderStageProgress();
@@ -1084,6 +1281,7 @@ function resetProgress() {
   ensureCurrentItemAllowed();
   updateHeroCta();
   renderCard();
+  renderDailyWidget();
 }
 
 elements.playAudio.addEventListener('click', () => speak(state.currentItem));
@@ -1094,12 +1292,14 @@ elements.resetButton.addEventListener('click', resetProgress);
 elements.startAlphabetPractice?.addEventListener('click', () =>
   startCustomSession(Array.from(state.manualUnfamiliar), '字母 / 音標自選練習')
 );
-elements.startUnfamiliarPractice?.addEventListener('click', () =>
-  startCustomSession(gatherUnfamiliarIds(), '不熟項目練習')
-);
-elements.drillUnfamiliar?.addEventListener('click', () =>
-  startCustomSession(gatherUnfamiliarIds(), '不熟題集中練習')
-);
+elements.startUnfamiliarPractice?.addEventListener('click', () => {
+  const ids = gatherUnfamiliarIds();
+  startCustomSession(ids, '修羅場模式', { modeType: 'unfamiliar', snapshotIds: ids });
+});
+elements.drillUnfamiliar?.addEventListener('click', () => {
+  const ids = gatherUnfamiliarIds();
+  startCustomSession(ids, '修羅場模式', { modeType: 'unfamiliar', snapshotIds: ids });
+});
 
 elements.heroCta?.addEventListener('click', () => {
   if (state.mode === 'custom') {
@@ -1143,3 +1343,5 @@ renderStageProgress();
 ensureCurrentItemAllowed();
 renderCard();
 renderCustomIndicator();
+renderDailyWidget();
+maybeShowDailyReminder();

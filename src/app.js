@@ -17,10 +17,14 @@ const elements = {
     word: document.getElementById('toggle-word')
   },
   troubleList: document.getElementById('trouble-list'),
+  alphabetList: document.getElementById('alphabet-list'),
+  manualList: document.getElementById('manual-list'),
   resetButton: document.getElementById('reset-progress')
 };
 
 const localStorageKey = 'thai-learning-progress';
+const manualStorageKey = 'thai-learning-manual-unfamiliar';
+const categoryOrder = Object.fromEntries(categories.map((category, index) => [category.id, index]));
 
 const state = {
   currentItem: learningItems[0],
@@ -30,8 +34,43 @@ const state = {
   promptOverride: '',
   showBreakdown: false,
   progress: loadProgress(),
+  manualUnfamiliar: loadManualUnfamiliar(),
   filters: new Set(categories.map((c) => c.id))
 };
+
+function loadManualUnfamiliar() {
+  try {
+    const cached = localStorage.getItem(manualStorageKey);
+    return new Set(cached ? JSON.parse(cached) : []);
+  } catch (error) {
+    console.warn('無法讀取不熟資料庫，使用預設值', error);
+    return new Set();
+  }
+}
+
+function saveManualUnfamiliar() {
+  try {
+    localStorage.setItem(manualStorageKey, JSON.stringify(Array.from(state.manualUnfamiliar)));
+  } catch (error) {
+    console.warn('無法儲存不熟資料庫', error);
+  }
+}
+
+function setManualFlag(itemId, shouldAdd, row) {
+  if (shouldAdd) {
+    state.manualUnfamiliar.add(itemId);
+  } else {
+    state.manualUnfamiliar.delete(itemId);
+  }
+  if (row) {
+    row.dataset.flagged = shouldAdd ? 'true' : 'false';
+  }
+  saveManualUnfamiliar();
+  updateManualList();
+  if (!row) {
+    renderAlphabetList();
+  }
+}
 
 function loadProgress() {
   try {
@@ -104,7 +143,8 @@ function computeWeight(item) {
   const goal = item.masteryGoal ?? 5;
   const familiarityGap = Math.max(goal - stats.score, 0);
   const penalty = Math.max(stats.incorrect - stats.correct * 0.3, 0);
-  return 1 + familiarityGap + penalty;
+  const manualBoost = state.manualUnfamiliar.has(item.id) ? 3 : 0;
+  return 1 + familiarityGap + penalty + manualBoost;
 }
 
 function pickWeightedItem(excludeId) {
@@ -325,6 +365,103 @@ function updateTroubleList() {
   });
 }
 
+function renderAlphabetList() {
+  if (!elements.alphabetList) return;
+  elements.alphabetList.innerHTML = '';
+
+  categories.forEach((category) => {
+    const groupItems = learningItems.filter((item) => item.category === category.id);
+    if (!groupItems.length) return;
+
+    const section = document.createElement('div');
+    const title = document.createElement('p');
+    title.className = 'alphabet-section-title';
+    title.textContent = category.label;
+    section.appendChild(title);
+
+    const grid = document.createElement('div');
+    grid.className = 'alphabet-grid';
+
+    groupItems.forEach((item) => {
+      const row = document.createElement('div');
+      row.className = 'alphabet-item';
+      row.dataset.flagged = state.manualUnfamiliar.has(item.id) ? 'true' : 'false';
+
+      const info = document.createElement('div');
+      info.className = 'alphabet-item-info';
+
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.checked = state.manualUnfamiliar.has(item.id);
+      checkbox.setAttribute('aria-label', `將 ${item.thai} 加入不熟資料庫`);
+      checkbox.addEventListener('change', (event) => setManualFlag(item.id, event.target.checked, row));
+
+      const text = document.createElement('div');
+      text.innerHTML = `<strong>${item.thai}</strong><div>${item.transliteration}</div>`;
+
+      info.append(checkbox, text);
+
+      const jump = document.createElement('button');
+      jump.className = 'ghost-button mini-button';
+      jump.textContent = '練習';
+      jump.addEventListener('click', () => goToItem(item.id, true));
+
+      row.append(info, jump);
+      grid.appendChild(row);
+    });
+
+    section.appendChild(grid);
+    elements.alphabetList.appendChild(section);
+  });
+}
+
+function updateManualList() {
+  if (!elements.manualList) return;
+  elements.manualList.innerHTML = '';
+
+  if (!state.manualUnfamiliar.size) {
+    const empty = document.createElement('p');
+    empty.className = 'empty-state';
+    empty.textContent = '目前沒有標記的不熟項目。';
+    elements.manualList.appendChild(empty);
+    return;
+  }
+
+  const items = Array.from(state.manualUnfamiliar)
+    .map((id) => itemMap[id])
+    .filter(Boolean)
+    .sort(
+      (a, b) =>
+        (categoryOrder[a.category] ?? 0) - (categoryOrder[b.category] ?? 0) ||
+        a.thai.localeCompare(b.thai)
+    );
+
+  items.forEach((item) => {
+    const entry = document.createElement('div');
+    entry.className = 'manual-entry';
+
+    const info = document.createElement('div');
+    info.innerHTML = `<strong>${item.thai}</strong><div>${item.transliteration}</div>`;
+
+    const actions = document.createElement('div');
+    actions.className = 'manual-actions';
+
+    const review = document.createElement('button');
+    review.className = 'ghost-button mini-button';
+    review.textContent = '練習';
+    review.addEventListener('click', () => goToItem(item.id, true));
+
+    const remove = document.createElement('button');
+    remove.className = 'ghost-button mini-button';
+    remove.textContent = '移除';
+    remove.addEventListener('click', () => setManualFlag(item.id, false));
+
+    actions.append(review, remove);
+    entry.append(info, actions);
+    elements.manualList.appendChild(entry);
+  });
+}
+
 function resetProgress() {
   if (!confirm('確定要清除全部紀錄嗎？')) return;
   state.progress = {};
@@ -364,4 +501,6 @@ elements.resetButton.addEventListener('click', resetProgress);
 
 initToggles();
 updateTroubleList();
+renderAlphabetList();
+updateManualList();
 renderCard();

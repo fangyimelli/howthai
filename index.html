@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>泰語圖像式記憶練習</title>
+    <link rel="stylesheet" href="src/styles.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <div>
+        <h1>泰語圖像式記憶練習</h1>
+        <p>子音、母音、音調、單字圖像式記憶學習工具</p>
+      </div>
+      <button id="reset-progress" class="ghost-button">清除紀錄</button>
+    </header>
+
+    <main class="app-shell">
+      <section class="card" id="learning-card">
+        <div class="card-header">
+          <span class="badge" id="category-label"></span>
+          <div class="progress" id="progress-indicator"></div>
+        </div>
+        <h2 id="thai-script"></h2>
+        <p id="mnemonic"></p>
+
+        <div class="actions">
+          <button id="play-audio">播放發音</button>
+          <div class="nav-buttons">
+            <button id="prev-card" class="ghost-button">上一題</button>
+            <button id="next-card" class="ghost-button">下一題</button>
+          </div>
+        </div>
+
+        <div id="question-area"></div>
+      </section>
+
+      <aside class="sidebar">
+        <section>
+          <h3>題型設定</h3>
+          <div class="toggle-group">
+            <label>
+              <input type="checkbox" id="toggle-consonant" checked /> 子音
+            </label>
+            <label>
+              <input type="checkbox" id="toggle-vowel" checked /> 母音
+            </label>
+            <label>
+              <input type="checkbox" id="toggle-tone" checked /> 音調
+            </label>
+            <label>
+              <input type="checkbox" id="toggle-word" checked /> 單字
+            </label>
+          </div>
+        </section>
+        <section class="alphabet-panel">
+          <h3>字母 / 音標表</h3>
+          <p class="section-hint">勾選代表加入不熟資料庫，出題時會優先抽到。</p>
+          <div id="alphabet-list" class="alphabet-list"></div>
+        </section>
+        <section>
+          <h3>不熟資料庫</h3>
+          <div id="manual-list" class="manual-list"></div>
+        </section>
+        <section>
+          <h3>不熟悉排行</h3>
+          <ol id="trouble-list"></ol>
+        </section>
+      </aside>
+    </main>
+
+    <template id="option-template">
+      <button class="option-button"></button>
+    </template>
+
+    <script type="module" src="src/app.js"></script>
+  </body>
+</html>

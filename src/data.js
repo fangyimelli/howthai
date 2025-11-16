@@ -1,11 +1,14 @@
-export const categories = [
+/* global window */
+
+(function attachThaiLearningData(global) {
+  const categories = [
   { id: 'consonant', label: '子音', color: '#fcd34d' },
   { id: 'vowel', label: '母音', color: '#f472b6' },
   { id: 'tone', label: '音調', color: '#60a5fa' },
   { id: 'word', label: '單字', color: '#34d399' }
-];
+  ];
 
-export const learningItems = [
+  const learningItems = [
   {
     id: 'k_kai',
     thai: 'ก',
@@ -298,6 +301,16 @@ export const learningItems = [
     speechText: 'อี',
     masteryGoal: 5
   }
-];
+  ];
 
-export const itemMap = Object.fromEntries(learningItems.map((item) => [item.id, item]));
+  const itemMap = learningItems.reduce((map, item) => {
+    map[item.id] = item;
+    return map;
+  }, {});
+
+  global.ThaiLearningData = {
+    categories,
+    learningItems,
+    itemMap
+  };
+})(typeof window !== 'undefined' ? window : globalThis);

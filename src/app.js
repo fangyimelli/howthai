@@ -1,4 +1,18 @@
-import { categories, learningItems, itemMap } from './data.js';
+/* global ThaiLearningData */
+
+const dataSource = (typeof ThaiLearningData !== 'undefined' && ThaiLearningData) || {
+  categories: [],
+  learningItems: [],
+  itemMap: {}
+};
+
+const categories = dataSource.categories;
+const learningItems = dataSource.learningItems;
+const itemMap = dataSource.itemMap;
+
+if (!learningItems.length) {
+  throw new Error('ThaiLearningData 未正確載入，請確認 src/data.js 有成功讀取。');
+}
 
 const stageFlow = [
   { id: 'consonant', label: '子音關卡', categories: ['consonant'] },

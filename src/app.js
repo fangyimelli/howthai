@@ -53,8 +53,6 @@ const manualStorageKey = 'thai-learning-manual-unfamiliar';
 const stageStorageKey = 'thai-learning-stage-gate';
 const dailyStorageKey = 'thai-learning-daily-tracker';
 const dailyGoal = { attempts: 30, accuracy: 70 };
-const dailyStorageKey = 'thai-learning-daily-tracker';
-const dailyGoal = { attempts: 30, accuracy: 70 };
 const categoryOrder = Object.fromEntries(categories.map((category, index) => [category.id, index]));
 
 const defaultCategory = stageFlow[0].categories[0];

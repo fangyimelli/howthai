@@ -7,30 +7,37 @@ const stageFlow = [
 ];
 
 const elements = {
+  heroCta: document.getElementById('hero-cta'),
+  heroHint: document.getElementById('hero-hint'),
+  card: document.getElementById('learning-card'),
   categoryLabel: document.getElementById('category-label'),
-  progressIndicator: document.getElementById('progress-indicator'),
+  phoneticLabel: document.getElementById('phonetic-label'),
   thaiScript: document.getElementById('thai-script'),
   mnemonic: document.getElementById('mnemonic'),
   questionArea: document.getElementById('question-area'),
+  feedbackArea: document.getElementById('feedback-area'),
   playAudio: document.getElementById('play-audio'),
-  prev: document.getElementById('prev-card'),
+  showAnswer: document.getElementById('show-answer'),
   next: document.getElementById('next-card'),
-  stageProgress: document.getElementById('stage-progress'),
-  toggles: {
-    consonant: document.getElementById('toggle-consonant'),
-    vowel: document.getElementById('toggle-vowel'),
-    tone: document.getElementById('toggle-tone'),
-    word: document.getElementById('toggle-word')
-  },
+  stageSubtitle: document.getElementById('stage-subtitle'),
+  accuracyFill: document.getElementById('accuracy-fill'),
+  accuracyLabel: document.getElementById('accuracy-label'),
+  comboValue: document.getElementById('combo-value'),
+  stageRoadmap: document.getElementById('stage-roadmap'),
+  stageCelebration: document.getElementById('stage-celebration'),
+  celebrationContinue: document.getElementById('celebration-continue'),
+  customIndicator: document.getElementById('custom-indicator'),
   troubleList: document.getElementById('trouble-list'),
   alphabetList: document.getElementById('alphabet-list'),
   unfamiliarPool: document.getElementById('unfamiliar-pool'),
+  unfamiliarCount: document.getElementById('unfamiliar-count'),
   resetButton: document.getElementById('reset-progress'),
   startAlphabetPractice: document.getElementById('start-alphabet-practice'),
   startUnfamiliarPractice: document.getElementById('start-unfamiliar-practice'),
-  navButtons: document.querySelectorAll('[data-view-target]'),
-  views: document.querySelectorAll('.view'),
-  customIndicator: document.getElementById('custom-indicator')
+  modeTabs: document.getElementById('mode-tabs'),
+  modeTip: document.getElementById('mode-tip'),
+  visualSymbol: document.getElementById('visual-symbol'),
+  drillUnfamiliar: document.getElementById('drill-unfamiliar')
 };
 
 const localStorageKey = 'thai-learning-progress';
@@ -38,23 +45,26 @@ const manualStorageKey = 'thai-learning-manual-unfamiliar';
 const stageStorageKey = 'thai-learning-stage-gate';
 const categoryOrder = Object.fromEntries(categories.map((category, index) => [category.id, index]));
 
+const defaultCategory = stageFlow[0].categories[0];
+
 const state = {
   currentItem: learningItems[0],
-  history: [learningItems[0].id],
-  historyPointer: 0,
   stage: 'quiz',
   promptOverride: '',
   showBreakdown: false,
+  answerRevealed: false,
   progress: loadProgress(),
   manualUnfamiliar: loadManualUnfamiliar(),
   stageGate: loadStageGate(),
-  filters: new Set(categories.map((c) => c.id)),
-  view: 'practice',
+  activeFilter: defaultCategory,
   mode: 'gate',
   customPool: [],
   customLabel: '',
   customStats: { attempts: 0, correct: 0, consecutive: 0 },
-  troubleIds: []
+  customStartSnapshot: null,
+  troubleIds: [],
+  previousCombo: 0,
+  recentUnlock: null
 };
 
 function loadManualUnfamiliar() {
@@ -127,20 +137,6 @@ function saveStageGate() {
   }
 }
 
-function switchView(viewId) {
-  state.view = viewId;
-  if (elements.views) {
-    elements.views.forEach((view) => {
-      view.classList.toggle('active', view.dataset.view === viewId);
-    });
-  }
-  if (elements.navButtons) {
-    elements.navButtons.forEach((button) => {
-      button.classList.toggle('active', button.dataset.viewTarget === viewId);
-    });
-  }
-}
-
 function renderCustomIndicator() {
   if (!elements.customIndicator) return;
   if (state.mode !== 'custom') {
@@ -167,10 +163,16 @@ function startCustomSession(itemIds, label = '自選練習') {
   state.customPool = pool.map((item) => item.id);
   state.customLabel = label;
   state.customStats = { attempts: 0, correct: 0, consecutive: 0 };
+  state.customStartSnapshot = new Set(state.troubleIds);
+  state.stage = 'quiz';
+  state.showBreakdown = false;
+  state.answerRevealed = false;
   renderCustomIndicator();
-  switchView('practice');
+  renderModeTabs();
+  updateHeroCta();
+  scrollToPractice();
   const startId = state.customPool[Math.floor(Math.random() * state.customPool.length)];
-  goToItem(startId, true);
+  goToItem(startId);
 }
 
 function endCustomSession(completed = false) {
@@ -179,10 +181,21 @@ function endCustomSession(completed = false) {
   state.customPool = [];
   state.customLabel = '';
   state.customStats = { attempts: 0, correct: 0, consecutive: 0 };
+  const snapshot = state.customStartSnapshot;
+  state.customStartSnapshot = null;
   renderCustomIndicator();
+  renderModeTabs();
   ensureCurrentItemAllowed();
+  updateHeroCta();
   if (completed) {
-    showFeedback('自選練習達標，返回闖關模式！', true);
+    const removed = snapshot
+      ? Array.from(snapshot).filter((id) => !state.troubleIds.includes(id)).length
+      : 0;
+    if (removed > 0) {
+      showFeedback(`不熟題已消除 ${removed} 題！`, true);
+    } else {
+      showFeedback('自選練習達標，返回闖關模式！', true);
+    }
   }
 }
 
@@ -258,63 +271,165 @@ function allowedCategoriesFromStage() {
 }
 
 function ensureCurrentItemAllowed() {
-  if (!state.currentItem) return;
-  if (state.mode === 'custom') return;
-  if (!allowedCategoriesFromStage().has(state.currentItem.category)) {
+  if (!state.currentItem || state.mode === 'custom') return;
+  const allowed = allowedCategoriesFromStage();
+  if (!allowed.has(state.currentItem.category) || state.currentItem.category !== state.activeFilter) {
     selectNextItem();
   }
 }
 
-function syncToggleStates() {
+function ensureActiveFilterAllowed() {
+  if (state.mode === 'custom') return;
   const allowed = allowedCategoriesFromStage();
-  Object.entries(elements.toggles).forEach(([key, checkbox]) => {
-    const wasDisabled = checkbox.disabled;
-    const isAllowed = allowed.has(key);
-    checkbox.disabled = !isAllowed;
-    if (!isAllowed) {
-      checkbox.checked = false;
-      state.filters.delete(key);
-    } else if (wasDisabled && isAllowed) {
-      checkbox.checked = true;
-      state.filters.add(key);
+  if (allowed.size === 0) return;
+  if (!allowed.has(state.activeFilter)) {
+    state.activeFilter = Array.from(allowed)[0];
+  }
+}
+
+function renderModeTabs() {
+  if (!elements.modeTabs) return;
+  const allowed = allowedCategoriesFromStage();
+  elements.modeTabs.innerHTML = '';
+  categories.forEach((category) => {
+    const button = document.createElement('button');
+    button.className = 'mode-tab';
+    button.textContent = category.label;
+    button.dataset.category = category.id;
+    const isAllowed = allowed.has(category.id);
+    button.dataset.locked = isAllowed ? 'false' : 'true';
+    if (state.activeFilter === category.id && state.mode !== 'custom') {
+      button.classList.add('active');
     }
+    if (state.mode === 'custom') {
+      button.dataset.mode = 'custom';
+      button.title = '完成自選練習後即可切換題型';
+    } else if (!isAllowed) {
+      button.title = '請先完成前一關';
+    }
+    button.disabled = state.mode === 'custom' || !isAllowed;
+    button.addEventListener('click', () => handleModeTab(category.id, isAllowed));
+    elements.modeTabs.appendChild(button);
   });
+  updateModeTip();
+}
+
+function handleModeTab(categoryId, isAllowed) {
+  if (state.mode === 'custom') {
+    showFeedback('正在自選練習，完成後即可切換題型。', false, { flash: false });
+    return;
+  }
+  if (!isAllowed) {
+    const stageMeta = stageFlow.find((stage) => stage.categories.includes(categoryId));
+    showFeedback(`建議先把${stageMeta?.label ?? '上一關'}練到 80% 且連對 10 題，再挑戰這個題型 😊`, false, {
+      flash: false
+    });
+    return;
+  }
+  state.activeFilter = categoryId;
+  if (state.currentItem.category !== categoryId) {
+    selectNextItem();
+  } else {
+    renderCard();
+  }
+  renderModeTabs();
+}
+
+function updateModeTip() {
+  if (!elements.modeTip) return;
+  if (state.mode === 'custom') {
+    elements.modeTip.textContent = '自選練習進行中，達到 80% 正確率＋連對 10 題即會結束。';
+    return;
+  }
+  const category = categories.find((item) => item.id === state.activeFilter);
+  const stageMeta = stageFlow.find((stage) => stage.categories.includes(state.activeFilter));
+  elements.modeTip.textContent = `目前專注：${category?.label ?? ''} · 關卡：${stageMeta?.label ?? ''}`;
+}
+
+function updateHeroCta() {
+  if (!elements.heroCta || !elements.heroHint) return;
+  const totalAttempts = Object.values(state.stageGate.stats).reduce(
+    (sum, stats) => sum + (stats?.attempts ?? 0),
+    0
+  );
+  if (state.mode === 'custom') {
+    elements.heroCta.textContent = '結束自選練習';
+  } else {
+    elements.heroCta.textContent = totalAttempts > 0 ? '繼續上次進度' : '開始練習';
+  }
+  const currentStageId = state.stageGate.currentStage;
+  const stageMeta = stageFlow.find((stage) => stage.id === currentStageId);
+  const stats = state.stageGate.stats[currentStageId];
+  const accuracy = stats?.attempts ? Math.round((stats.correct / stats.attempts) * 100) : 0;
+  elements.heroHint.textContent = `目前進度：${stageMeta?.label ?? '全部完成'} · 正確率 ${accuracy}% / 80% · 連對 ${
+    stats?.consecutive ?? 0
+  }/10`;
+}
+
+function scrollToPractice() {
+  document.getElementById('practice')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 function renderStageProgress() {
-  if (!elements.stageProgress) return;
-  elements.stageProgress.innerHTML = '';
   const currentStageId = state.stageGate.currentStage;
+  const currentStage = stageFlow.find((stage) => stage.id === currentStageId) ?? stageFlow[0];
+  const stats = state.stageGate.stats[currentStageId];
+  const accuracy = stats?.attempts ? Math.round((stats.correct / stats.attempts) * 100) : 0;
 
-  stageFlow.forEach((stage) => {
-    const stats = state.stageGate.stats[stage.id];
-    const accuracy = stats.attempts ? Math.round((stats.correct / stats.attempts) * 100) : 0;
+  if (elements.stageSubtitle) {
+    elements.stageSubtitle.textContent = currentStage?.label ?? '全部完成';
+  }
+  if (elements.accuracyFill) {
+    elements.accuracyFill.style.width = `${Math.min(accuracy, 100)}%`;
+  }
+  if (elements.accuracyLabel) {
+    elements.accuracyLabel.textContent = `${accuracy}% / 80%`;
+  }
+  if (elements.comboValue) {
+    const combo = stats?.consecutive ?? 0;
+    elements.comboValue.textContent = `連續答對 ${combo} / 10 題 🔥`;
+    elements.comboValue.classList.remove('combo-pop');
+    if (combo > state.previousCombo) {
+      elements.comboValue.classList.add('combo-pop');
+      setTimeout(() => elements.comboValue?.classList.remove('combo-pop'), 500);
+    }
+    state.previousCombo = combo;
+  }
 
-    const row = document.createElement('div');
-    row.className = 'stage-row';
-    row.dataset.status = stats.passed ? 'passed' : stage.id === currentStageId ? 'current' : 'locked';
+  if (elements.stageRoadmap) {
+    elements.stageRoadmap.innerHTML = '';
+    stageFlow.forEach((stage) => {
+      const dot = document.createElement('div');
+      dot.className = 'stage-dot';
+      const stageStats = state.stageGate.stats[stage.id];
+      let status = 'locked';
+      if (stageStats?.passed) {
+        status = 'done';
+      } else if (stage.id === currentStageId) {
+        status = 'current';
+      }
+      dot.dataset.status = status;
+      dot.title = stage.label;
+      elements.stageRoadmap.appendChild(dot);
+    });
+  }
 
-    const header = document.createElement('div');
-    header.className = 'stage-row-header';
+  if (elements.stageCelebration) {
+    if (state.recentUnlock) {
+      const unlockedStage = stageFlow.find((stage) => stage.id === state.recentUnlock);
+      const message = elements.stageCelebration.querySelector('p');
+      if (message) {
+        message.textContent = `✅ 恭喜！${unlockedStage?.label ?? '下一關'} 已解鎖`;
+      }
+      elements.stageCelebration.hidden = false;
+    } else {
+      elements.stageCelebration.hidden = true;
+    }
+  }
 
-    const title = document.createElement('div');
-    title.className = 'stage-title';
-    title.textContent = stage.label;
-
-    const badge = document.createElement('span');
-    badge.className = 'stage-badge';
-    badge.textContent =
-      stats.passed ? '已解鎖' : stage.id === currentStageId ? '進行中' : '未解鎖';
-
-    header.append(title, badge);
-
-    const statsLine = document.createElement('p');
-    statsLine.className = 'stage-row-stats';
-    statsLine.textContent = `正確率 ${accuracy}% · 連續正確 ${stats.consecutive} 題`;
-
-    row.append(header, statsLine);
-    elements.stageProgress.appendChild(row);
-  });
+  updateHeroCta();
+  ensureActiveFilterAllowed();
+  renderModeTabs();
 }
 
 function updateStageGate(categoryId, isCorrect) {
@@ -336,15 +451,12 @@ function updateStageGate(categoryId, isCorrect) {
     stats.passed = true;
     state.stageGate.currentStage = determineCurrentStage(state.stageGate.stats);
     unlockedStage = stageMeta;
+    state.recentUnlock = stageMeta?.id ?? null;
   }
 
   saveStageGate();
   renderStageProgress();
-  syncToggleStates();
   ensureCurrentItemAllowed();
-  if (unlockedStage) {
-    showFeedback(`恭喜通過${unlockedStage.label}，下一關已解鎖！`, true);
-  }
 }
 
 function getStats(id) {
@@ -357,25 +469,22 @@ function getStats(id) {
   return state.progress[id];
 }
 
-function goToItem(itemId, pushHistory = true) {
+function goToItem(itemId) {
   const item = itemMap[itemId];
   if (!item) return;
   if (state.mode !== 'custom' && !allowedCategoriesFromStage().has(item.category)) {
     const stageId = stageForCategory(item.category);
     const stageMeta = stageFlow.find((stage) => stage.id === stageId);
-    alert(`請先完成${stageMeta?.label ?? '上一關'}，才能練習這個題型。`);
+    showFeedback(`請先完成${stageMeta?.label ?? '上一關'}，才能練習這個題型。`, false, {
+      flash: false
+    });
     return;
   }
   state.currentItem = item;
   state.stage = 'quiz';
   state.promptOverride = '';
   state.showBreakdown = false;
-
-  if (pushHistory) {
-    state.history = state.history.slice(0, state.historyPointer + 1);
-    state.history.push(itemId);
-    state.historyPointer = state.history.length - 1;
-  }
+  state.answerRevealed = false;
 
   renderCard();
 }
@@ -411,7 +520,7 @@ function filteredItems() {
   }
   const gateAllowed = allowedCategoriesFromStage();
   const pool = learningItems.filter(
-    (item) => gateAllowed.has(item.category) && state.filters.has(item.category)
+    (item) => gateAllowed.has(item.category) && (!state.activeFilter || item.category === state.activeFilter)
   );
   if (pool.length) return pool;
   const fallback = learningItems.filter((item) => gateAllowed.has(item.category));
@@ -493,14 +602,28 @@ function renderCard() {
   elements.categoryLabel.textContent = categoryMeta?.label ?? '';
   elements.categoryLabel.style.borderColor = categoryMeta?.color ?? '#fff';
   elements.categoryLabel.style.color = categoryMeta?.color ?? '#fff';
-
-  elements.thaiScript.textContent = item.thai;
-  elements.mnemonic.textContent = item.mnemonic ?? '';
-
-  const stats = getStats(item.id);
-  const goal = item.masteryGoal ?? 5;
-  elements.progressIndicator.textContent = `掌握度 ${stats.score}/${goal} · 正確 ${stats.correct} · 錯誤 ${stats.incorrect}`;
-
+  if (elements.visualSymbol) {
+    elements.visualSymbol.textContent = item.visual ?? '🌟';
+  }
+  if (elements.thaiScript) {
+    elements.thaiScript.textContent = item.thai;
+  }
+  if (elements.mnemonic) {
+    elements.mnemonic.textContent = item.mnemonic ?? '';
+  }
+  if (elements.phoneticLabel) {
+    if (state.answerRevealed || state.stage === 'mnemonic') {
+      elements.phoneticLabel.dataset.revealed = 'true';
+      elements.phoneticLabel.textContent = `音標：${item.transliteration ?? '—'}`;
+    } else {
+      elements.phoneticLabel.dataset.revealed = 'false';
+      elements.phoneticLabel.textContent = '音標：？';
+    }
+  }
+  if (elements.feedbackArea) {
+    elements.feedbackArea.innerHTML = '';
+  }
+  elements.card?.classList.remove('flash-correct', 'flash-incorrect');
   renderQuestion();
 }
 
@@ -534,7 +657,10 @@ function renderQuestion() {
     fragment.appendChild(button);
   });
 
-  elements.questionArea.appendChild(fragment);
+  const optionsWrap = document.createElement('div');
+  optionsWrap.className = 'options-grid';
+  optionsWrap.appendChild(fragment);
+  elements.questionArea.appendChild(optionsWrap);
 
   if (state.showBreakdown && item.category === 'word') {
     const breakdown = document.createElement('div');
@@ -578,9 +704,10 @@ function handleOption(selectedText, button) {
     if (isCorrect) {
       state.stage = 'quiz';
       state.promptOverride = '記住圖像，再選一次正確發音！';
-      setTimeout(renderQuestion, 750);
+      showFeedback('圖像鎖定！再挑戰一次發音。', true, { flash: false });
+      setTimeout(renderQuestion, 800);
     } else {
-      showFeedback(`答案是：${item.mnemonicQuestion?.answer}`);
+      showFeedback(`答案是：${item.mnemonicQuestion?.answer}`, false, { flash: false });
       setTimeout(() => {
         state.stage = 'quiz';
         state.promptOverride = '';
@@ -594,15 +721,19 @@ function handleOption(selectedText, button) {
   const isCorrect = selectedText === item.transliteration;
   disableQuestionButtons();
   button.classList.add(isCorrect ? 'correct' : 'incorrect');
+  revealAnswer(true);
   recordResult(item, isCorrect);
+  const stats = getStats(item.id);
 
   if (isCorrect) {
-    showFeedback('太棒了！繼續下一題。', true);
+    showFeedback(`✔ 答對！連續 ${stats.streak ?? 0} 題`, true);
     state.promptOverride = '';
     state.showBreakdown = false;
     setTimeout(() => selectNextItem(), 1000);
   } else {
-    showFeedback(`正確答案是 ${item.transliteration}`);
+    showFeedback(`✘ 答錯，正確答案是 ${item.transliteration}`, false, {
+      subtext: '已加入不熟清單，稍後會優先抽到。'
+    });
     if (item.mnemonicQuestion) {
       state.stage = 'mnemonic';
       state.promptOverride = '';
@@ -610,19 +741,70 @@ function handleOption(selectedText, button) {
     if (item.category === 'word') {
       state.showBreakdown = true;
     }
-    setTimeout(() => renderQuestion(), item.mnemonicQuestion ? 800 : 1200);
+    setTimeout(() => renderQuestion(), item.mnemonicQuestion ? 900 : 1300);
     if (!item.mnemonicQuestion) {
-      setTimeout(() => selectNextItem(), 1500);
+      setTimeout(() => selectNextItem(), 2000);
     }
   }
 }
 
-function showFeedback(text, positive = false) {
-  const feedback = document.createElement('p');
-  feedback.className = 'feedback';
-  feedback.style.color = positive ? '#34d399' : '#f87171';
+function showFeedback(text, positive = false, options = {}) {
+  if (!elements.feedbackArea) return;
+  elements.feedbackArea.innerHTML = '';
+  const feedback = document.createElement('div');
+  feedback.className = `feedback-message ${positive ? 'positive' : 'negative'}`;
   feedback.textContent = text;
-  elements.questionArea.appendChild(feedback);
+  elements.feedbackArea.appendChild(feedback);
+
+  if (options.subtext) {
+    const subtext = document.createElement('p');
+    subtext.className = 'feedback-subtext';
+    subtext.textContent = options.subtext;
+    elements.feedbackArea.appendChild(subtext);
+  }
+
+  if (options.flash !== false) {
+    flashCard(positive ? 'correct' : 'incorrect');
+  }
+}
+
+function flashCard(type) {
+  if (!elements.card) return;
+  elements.card.classList.remove('flash-correct', 'flash-incorrect');
+  const className = type === 'correct' ? 'flash-correct' : 'flash-incorrect';
+  elements.card.classList.add(className);
+  setTimeout(() => elements.card?.classList.remove(className), 600);
+}
+
+function revealAnswer(fromInteraction = false) {
+  const item = state.currentItem;
+  if (!item) return;
+  if (state.stage === 'mnemonic' && !fromInteraction) {
+    showFeedback(`圖像提示答案是 ${item.mnemonicQuestion?.answer ?? ''}`, false, { flash: false });
+    return;
+  }
+  state.answerRevealed = true;
+  if (elements.phoneticLabel) {
+    elements.phoneticLabel.dataset.revealed = 'true';
+    elements.phoneticLabel.textContent = `音標：${item.transliteration ?? '—'}`;
+  }
+  highlightCorrectOption();
+  if (!fromInteraction) {
+    disableQuestionButtons();
+    showFeedback(`答案：${item.transliteration}`, false, {
+      subtext: '先記下來，再按「下一題」繼續。',
+      flash: false
+    });
+  }
+}
+
+function highlightCorrectOption() {
+  if (!elements.questionArea || state.stage === 'mnemonic') return;
+  elements.questionArea.querySelectorAll('.option-button').forEach((button) => {
+    if (button.textContent === state.currentItem.transliteration) {
+      button.classList.add('reveal');
+    }
+  });
 }
 
 function selectNextItem() {
@@ -631,7 +813,9 @@ function selectNextItem() {
     return;
   }
   const nextItem = pickWeightedItem(state.currentItem?.id);
-  goToItem(nextItem.id, true);
+  if (nextItem) {
+    goToItem(nextItem.id);
+  }
 }
 
 function updateTroubleList() {
@@ -643,7 +827,7 @@ function updateTroubleList() {
     })
     .filter(({ stats }) => stats.attempts > 0 && (stats.streak ?? 0) < 5)
     .sort((a, b) => a.accuracy - b.accuracy || b.stats.attempts - a.stats.attempts)
-    .slice(0, 8);
+    .slice(0, 5);
 
   state.troubleIds = itemsWithStats.map(({ item }) => item.id);
 
@@ -651,14 +835,22 @@ function updateTroubleList() {
     elements.troubleList.innerHTML = '';
     if (!itemsWithStats.length) {
       const empty = document.createElement('li');
-      empty.textContent = '目前沒有系統偵測的不熟項目。';
+      empty.className = 'empty';
+      empty.textContent = '今天的字母都很乖，沒有調皮鬼。';
       elements.troubleList.appendChild(empty);
     } else {
-      itemsWithStats.forEach(({ item, stats, accuracy }) => {
+      itemsWithStats.forEach(({ item, stats, accuracy }, index) => {
         const li = document.createElement('li');
+        li.dataset.rank = index + 1;
         const percent = Math.round(accuracy * 100);
         const needed = Math.max(0, 5 - (stats.streak ?? 0));
-        li.textContent = `${item.thai} · ${percent}% 正確 · 連對 ${stats.streak ?? 0}/5 (還需 ${needed})`;
+        li.innerHTML = `
+          <span class="trouble-glyph">${item.thai}</span>
+          <div class="trouble-meta">
+            <p>錯 ${stats.incorrect ?? 0} 次 · 正確率 ${percent}%</p>
+            <p>還需連對 ${needed} 題就畢業</p>
+          </div>
+        `;
         li.addEventListener('click', () => startCustomSession([item.id], `${item.thai} 集中練習`));
         elements.troubleList.appendChild(li);
       });
@@ -706,7 +898,7 @@ function renderAlphabetList() {
       const jump = document.createElement('button');
       jump.className = 'ghost-button mini-button';
       jump.textContent = '練習';
-      jump.addEventListener('click', () => goToItem(item.id, true));
+      jump.addEventListener('click', () => goToItem(item.id));
 
       row.append(info, jump);
       grid.appendChild(row);
@@ -744,7 +936,16 @@ function renderUnfamiliarPool() {
     }
   });
 
-  if (!entryMap.size) {
+  const entries = Array.from(entryMap.values()).sort(
+    (a, b) =>
+      (categoryOrder[a.item.category] ?? 0) - (categoryOrder[b.item.category] ?? 0) ||
+      a.item.thai.localeCompare(b.item.thai)
+  );
+
+  updateUnfamiliarSummary(entries.length);
+  updateUnfamiliarButtons(entries.length > 0);
+
+  if (!entries.length) {
     const empty = document.createElement('p');
     empty.className = 'empty-state';
     empty.textContent = '目前沒有不熟項目。';
@@ -752,12 +953,7 @@ function renderUnfamiliarPool() {
     return;
   }
 
-  Array.from(entryMap.values())
-    .sort(
-      (a, b) =>
-        (categoryOrder[a.item.category] ?? 0) - (categoryOrder[b.item.category] ?? 0) ||
-        a.item.thai.localeCompare(b.item.thai)
-    )
+  entries
     .forEach(({ item, sources, stats }) => {
       const entry = document.createElement('div');
       entry.className = 'unfamiliar-entry';
@@ -814,6 +1010,24 @@ function renderUnfamiliarPool() {
     });
 }
 
+function updateUnfamiliarSummary(count) {
+  if (!elements.unfamiliarCount) return;
+  if (count === 0) {
+    elements.unfamiliarCount.textContent = '目前沒有不熟項目，保持加油！';
+  } else {
+    elements.unfamiliarCount.textContent = `目前不熟項目 ${count} 題，將優先抽出加強。`;
+  }
+}
+
+function updateUnfamiliarButtons(hasItems) {
+  if (elements.drillUnfamiliar) {
+    elements.drillUnfamiliar.disabled = !hasItems;
+  }
+  if (elements.startUnfamiliarPractice) {
+    elements.startUnfamiliarPractice.disabled = !hasItems;
+  }
+}
+
 function resetProgress() {
   if (!confirm('確定要清除全部紀錄嗎？')) return;
   state.progress = {};
@@ -823,44 +1037,21 @@ function resetProgress() {
     currentStage: stageFlow[0].id
   };
   state.stageGate.currentStage = determineCurrentStage(state.stageGate.stats);
+  state.recentUnlock = null;
+  state.previousCombo = 0;
   saveStageGate();
   updateTroubleList();
   renderStageProgress();
-  syncToggleStates();
+  ensureActiveFilterAllowed();
+  renderModeTabs();
   ensureCurrentItemAllowed();
+  updateHeroCta();
   renderCard();
 }
 
-function initToggles() {
-  Object.entries(elements.toggles).forEach(([key, checkbox]) => {
-    checkbox.addEventListener('change', () => {
-      if (checkbox.checked) {
-        state.filters.add(key);
-      } else {
-        state.filters.delete(key);
-      }
-      if (state.filters.size === 0) {
-        allowedCategoriesFromStage().forEach((categoryId) => {
-          state.filters.add(categoryId);
-          const toggle = elements.toggles[categoryId];
-          if (toggle) toggle.checked = true;
-        });
-      }
-      if (!state.filters.has(state.currentItem.category)) {
-        selectNextItem();
-      }
-    });
-  });
-}
-
 elements.playAudio.addEventListener('click', () => speak(state.currentItem));
+elements.showAnswer?.addEventListener('click', () => revealAnswer(false));
 elements.next.addEventListener('click', () => selectNextItem());
-elements.prev.addEventListener('click', () => {
-  if (state.historyPointer === 0) return;
-  state.historyPointer -= 1;
-  const previousId = state.history[state.historyPointer];
-  goToItem(previousId, false);
-});
 elements.resetButton.addEventListener('click', resetProgress);
 
 elements.startAlphabetPractice?.addEventListener('click', () =>
@@ -869,19 +1060,49 @@ elements.startAlphabetPractice?.addEventListener('click', () =>
 elements.startUnfamiliarPractice?.addEventListener('click', () =>
   startCustomSession(gatherUnfamiliarIds(), '不熟項目練習')
 );
+elements.drillUnfamiliar?.addEventListener('click', () =>
+  startCustomSession(gatherUnfamiliarIds(), '不熟題集中練習')
+);
 
-if (elements.navButtons) {
-  elements.navButtons.forEach((button) => {
-    button.addEventListener('click', () => switchView(button.dataset.viewTarget));
+elements.heroCta?.addEventListener('click', () => {
+  if (state.mode === 'custom') {
+    endCustomSession(false);
+    scrollToPractice();
+    return;
+  }
+  scrollToPractice();
+  const totalAttempts = Object.values(state.stageGate.stats).reduce(
+    (sum, stats) => sum + (stats?.attempts ?? 0),
+    0
+  );
+  if (totalAttempts === 0) {
+    selectNextItem();
+  }
+});
+
+elements.celebrationContinue?.addEventListener('click', () => {
+  state.recentUnlock = null;
+  renderStageProgress();
+  selectNextItem();
+});
+
+const mobileButtons = document.querySelectorAll('[data-mobile-action]');
+mobileButtons.forEach((button) => {
+  button.addEventListener('click', () => {
+    const action = button.dataset.mobileAction;
+    if (action === 'play') {
+      speak(state.currentItem);
+    } else if (action === 'answer') {
+      revealAnswer(false);
+    } else if (action === 'next') {
+      selectNextItem();
+    }
   });
-}
+});
 
-initToggles();
-syncToggleStates();
 updateTroubleList();
 renderAlphabetList();
 renderStageProgress();
 ensureCurrentItemAllowed();
 renderCard();
-switchView('practice');
 renderCustomIndicator();

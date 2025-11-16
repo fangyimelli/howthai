@@ -12,6 +12,7 @@ export const learningItems = [
     transliteration: 'k / g',
     englishHint: 'unaspirated k like “go”',
     mnemonic: '字體像側面的小雞，想到呱呱雞就記得這個字形。',
+    visual: '🐔',
     category: 'consonant',
     mnemonicQuestion: {
       prompt: 'ก 的形狀最像哪一個動物？',
@@ -27,6 +28,7 @@ export const learningItems = [
     transliteration: 'kh',
     englishHint: '強氣 kh, like “khaki”',
     mnemonic: '像張開嘴巴的怪獸，張嘴吸氣準備噴火。',
+    visual: '🐲',
     category: 'consonant',
     mnemonicQuestion: {
       prompt: '哪個畫面最像 ค ？',
@@ -42,6 +44,7 @@ export const learningItems = [
     transliteration: 'ch',
     englishHint: '像英文 chair 的 ch',
     mnemonic: '筆畫像小象長鼻，想像大象伸長鼻子。',
+    visual: '🐘',
     category: 'consonant',
     mnemonicQuestion: {
       prompt: 'ช 讓你想到？',
@@ -57,6 +60,7 @@ export const learningItems = [
     transliteration: 's',
     englishHint: '清晰的 s，像英文 see',
     mnemonic: '像蜿蜒的蛇，腦中浮現一條蜷曲的蛇。',
+    visual: '🐍',
     category: 'consonant',
     mnemonicQuestion: {
       prompt: 'ส 看起來像哪個動物？',
@@ -72,6 +76,7 @@ export const learningItems = [
     transliteration: 'a (短)',
     englishHint: '短促的 a，像英文 up',
     mnemonic: '像一個張開的小嘴巴，畫面停在那張嘴上。',
+    visual: '👶',
     category: 'vowel',
     mnemonicQuestion: {
       prompt: '誰張開小嘴巴？',
@@ -87,6 +92,7 @@ export const learningItems = [
     transliteration: 'aa (長)',
     englishHint: '長母音 aa，像英文 father 的 a',
     mnemonic: '像拉長的橡皮筋，線條被拉得長長的。',
+    visual: '🪢',
     category: 'vowel',
     mnemonicQuestion: {
       prompt: '什麼東西被拉得長長的？',
@@ -102,6 +108,7 @@ export const learningItems = [
     transliteration: 'ai',
     englishHint: '像英文 hi 的 ai',
     mnemonic: '兩條線像兩支拐杖，好像老人扶著站立。',
+    visual: '🦯',
     category: 'vowel',
     mnemonicQuestion: {
       prompt: '兩支拐杖讓你想到誰？',
@@ -117,6 +124,7 @@ export const learningItems = [
     transliteration: 'mid tone',
     englishHint: '聲音平穩，不升不降',
     mnemonic: '像在平坦道路散步，地面筆直。',
+    visual: '🚶',
     category: 'tone',
     mnemonicQuestion: {
       prompt: '平調像走在什麼樣的路？',
@@ -132,6 +140,7 @@ export const learningItems = [
     transliteration: 'rising tone',
     englishHint: '像疑問語氣，尾音上揚',
     mnemonic: '好像坐電梯上樓，線條一路上升。',
+    visual: '🛗',
     category: 'tone',
     mnemonicQuestion: {
       prompt: '升調像搭什麼？',
@@ -147,6 +156,7 @@ export const learningItems = [
     transliteration: 'falling tone',
     englishHint: '先高後低，像感嘆「哎呀」',
     mnemonic: '像人在溜滑梯，一路滑到低處。',
+    visual: '🛝',
     category: 'tone',
     mnemonicQuestion: {
       prompt: '降調像在玩什麼？',
@@ -162,6 +172,7 @@ export const learningItems = [
     transliteration: 'sa-wat-dee',
     englishHint: '泰語你好',
     mnemonic: '想像雙手合十向人鞠躬，記住這個畫面。',
+    visual: '🙏',
     category: 'word',
     mnemonicQuestion: {
       prompt: '泰國見面會做什麼禮節？',
@@ -178,6 +189,7 @@ export const learningItems = [
     transliteration: 'sa-baai-dee-mai?',
     englishHint: '你最近好嗎？',
     mnemonic: '想像朋友掛念你，笑著關心你的表情。',
+    visual: '😊',
     category: 'word',
     mnemonicQuestion: {
       prompt: '說「你好嗎」時會有的表情？',
@@ -194,6 +206,7 @@ export const learningItems = [
     transliteration: 'ruu mai?',
     englishHint: '你知道嗎？',
     mnemonic: '想像朋友推眼鏡問「你知道嗎？」',
+    visual: '🤔',
     category: 'word',
     mnemonicQuestion: {
       prompt: '問句「你知道嗎」的語氣？',
@@ -210,6 +223,7 @@ export const learningItems = [
     transliteration: 'r',
     englishHint: '微捲舌或齒邊音 r',
     mnemonic: '像小魚鰭，彎彎的鰭片浮出水面。',
+    visual: '🐟',
     category: 'consonant',
     mnemonicQuestion: {
       prompt: 'ร 像什麼？',
@@ -225,6 +239,7 @@ export const learningItems = [
     transliteration: 'uu',
     englishHint: '嘴唇前噘的長 u',
     mnemonic: '像兩個氣泡浮上水面黏在一起。',
+    visual: '🫧',
     category: 'vowel',
     mnemonicQuestion: {
       prompt: '兩個氣泡排成的形狀最像什麼？',
@@ -240,6 +255,7 @@ export const learningItems = [
     transliteration: 'dee',
     englishHint: '好/美好',
     mnemonic: '想到雙手比讚，保持這個姿勢。',
+    visual: '👍',
     category: 'word',
     mnemonicQuestion: {
       prompt: '這個字讓你想到什麼手勢？',
@@ -256,6 +272,7 @@ export const learningItems = [
     transliteration: 'd',
     englishHint: '像英文 dog 的 d',
     mnemonic: '像鼓槌在敲鼓「咚」',
+    visual: '🥁',
     category: 'consonant',
     mnemonicQuestion: {
       prompt: 'ด 像什麼物品？',
@@ -271,6 +288,7 @@ export const learningItems = [
     transliteration: 'ii',
     englishHint: '長 i，像英文 see',
     mnemonic: '像拉直的雷射光，細長的線條。',
+    visual: '🔦',
     category: 'vowel',
     mnemonicQuestion: {
       prompt: '哪個選項最細長？',

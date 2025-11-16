@@ -7,97 +7,111 @@
     <link rel="stylesheet" href="src/styles.css" />
   </head>
   <body>
-    <header class="app-header">
-      <div>
+    <header class="hero">
+      <div class="hero-text">
+        <p class="hero-label">圖像＋聲音，一條線玩到底</p>
         <h1>泰語圖像式記憶練習</h1>
-        <p>子音、母音、音調、單字圖像式記憶學習工具</p>
-      </div>
-      <div class="header-actions">
-        <nav class="main-nav">
-          <button class="nav-button active" data-view-target="practice">闖關練習</button>
-          <button class="nav-button" data-view-target="alphabet">字母 / 音標表</button>
-          <button class="nav-button" data-view-target="unfamiliar">不熟資料庫</button>
-        </nav>
-        <button id="reset-progress" class="ghost-button">清除紀錄</button>
+        <p class="hero-subtitle">看圖＋聽音，一題一題把泰文子音母音記熟</p>
+        <div class="hero-cta">
+          <button id="hero-cta" class="primary-button">開始練習</button>
+          <p id="hero-hint" class="hero-hint">準備好闖關，先從子音開始！</p>
+        </div>
       </div>
     </header>
 
-    <main>
-      <section class="view active" data-view="practice">
-        <div class="app-shell">
-          <section class="card" id="learning-card">
-            <div class="card-header">
+    <main class="main-layout">
+      <section class="practice-stack" id="practice">
+        <article class="card" id="learning-card">
+          <div class="card-visual" id="visual-card">
+            <span id="visual-symbol">🌟</span>
+          </div>
+          <div class="card-body">
+            <div class="card-meta">
               <span class="badge" id="category-label"></span>
-              <div class="progress" id="progress-indicator"></div>
+              <span class="phonetic" id="phonetic-label" data-revealed="false">音標：？</span>
             </div>
             <h2 id="thai-script"></h2>
-            <p id="mnemonic"></p>
-
-            <div class="actions">
-              <button id="play-audio">播放發音</button>
-              <div class="nav-buttons">
-                <button id="prev-card" class="ghost-button">上一題</button>
-                <button id="next-card" class="ghost-button">下一題</button>
-              </div>
+            <p id="mnemonic" class="mnemonic"></p>
+            <div id="question-area" class="question-area"></div>
+            <div id="feedback-area" class="feedback-area"></div>
+            <div class="card-actions">
+              <button id="play-audio" class="ghost-button">播放發音</button>
+              <button id="show-answer" class="ghost-button">顯示答案</button>
+              <button id="next-card" class="primary-button">下一題</button>
             </div>
-
-            <div id="question-area"></div>
-          </section>
-
-          <aside class="sidebar">
-            <section class="stage-panel">
-              <h3>闖關進度</h3>
-              <p class="section-hint">每關需達到 80% 正確率並連續答對 10 題才會解鎖下一關。</p>
-              <div id="custom-indicator" class="custom-indicator"></div>
-              <div id="stage-progress" class="stage-progress"></div>
-            </section>
-            <section>
-              <h3>題型設定</h3>
-              <div class="toggle-group">
-                <label>
-                  <input type="checkbox" id="toggle-consonant" checked /> 子音
-                </label>
-                <label>
-                  <input type="checkbox" id="toggle-vowel" checked /> 母音
-                </label>
-                <label>
-                  <input type="checkbox" id="toggle-tone" checked /> 音調
-                </label>
-                <label>
-                  <input type="checkbox" id="toggle-word" checked /> 單字
-                </label>
-              </div>
-            </section>
-          </aside>
-        </div>
-      </section>
-
-      <section class="view" data-view="alphabet">
-        <div class="page-card">
-          <h2>字母 / 音標表</h2>
-          <p class="section-hint">勾選代表加入不熟資料庫，同時可透過下方按鈕以勾選項目開啟自選練習。</p>
-          <div id="alphabet-list" class="alphabet-list"></div>
-          <div class="page-actions">
-            <button id="start-alphabet-practice">以勾選項目開始練習</button>
           </div>
-          <p class="page-hint">自選練習需達到 80% 正確率且連續答對 10 題才會完成。</p>
-        </div>
-      </section>
+        </article>
 
-      <section class="view" data-view="unfamiliar">
-        <div class="page-card">
-          <h2>不熟資料庫</h2>
-          <p class="section-hint">結合手動勾選與系統偵測的不熟項目，供集中練習。系統偵測的項目連續答對 5 次會自動移除。</p>
-          <div id="unfamiliar-pool" class="unfamiliar-pool"></div>
-          <div class="page-actions">
-            <button id="start-unfamiliar-practice">練習不熟項目</button>
+        <aside class="stage-widget">
+          <div class="stage-header">
+            <div>
+              <h3>本關進度</h3>
+              <p id="stage-subtitle" class="stage-subtitle">子音關卡</p>
+            </div>
+            <button id="drill-unfamiliar" class="pill-button">專練不熟題</button>
           </div>
-          <section class="trouble-panel">
-            <h3>不熟悉排行</h3>
-            <p class="section-hint">僅顯示連續正確未滿 5 題的項目。</p>
+          <div class="stage-meter">
+            <div class="meter-label">正確率 80% 達標</div>
+            <div class="meter-track">
+              <div class="meter-fill" id="accuracy-fill"></div>
+            </div>
+            <p id="accuracy-label" class="meter-value">0% / 80%</p>
+          </div>
+          <div class="combo-line">
+            <p>連擊</p>
+            <div id="combo-value" class="combo-value">0 / 10 🔥</div>
+          </div>
+          <div id="stage-celebration" class="stage-celebration" hidden>
+            <p>✅ 恭喜破關！下一關已解鎖</p>
+            <button id="celebration-continue" class="primary-button">前往下一關</button>
+          </div>
+          <div class="stage-roadmap" id="stage-roadmap"></div>
+          <div id="custom-indicator" class="custom-indicator">目前為闖關模式。</div>
+          <section class="trouble-highlight">
+            <h4>今天最調皮的字母 😈</h4>
             <ol id="trouble-list"></ol>
           </section>
-        </div>
+        </aside>
+      </section>
+
+      <div class="mobile-action-bar">
+        <button data-mobile-action="play">播放</button>
+        <button data-mobile-action="answer">答案</button>
+        <button data-mobile-action="next" class="primary">下一題</button>
+      </div>
+
+      <section class="details-grid">
+        <details>
+          <summary>題型標籤＋建議路線</summary>
+          <p class="section-hint">依序練：子音 → 母音 → 音調 → 單字。若直接選單字，我們會提醒你先打好基礎。</p>
+          <div id="mode-tabs" class="mode-tabs"></div>
+          <p id="mode-tip" class="section-hint"></p>
+        </details>
+
+        <details>
+          <summary>字母 / 音標表</summary>
+          <p class="section-hint">勾選代表加入不熟資料庫，下方按鈕可用勾選項目開啟自選練習。</p>
+          <div id="alphabet-list" class="alphabet-list"></div>
+          <div class="page-actions">
+            <button id="start-alphabet-practice" class="ghost-button">以勾選項目開始練習</button>
+          </div>
+        </details>
+
+        <details>
+          <summary>不熟資料庫</summary>
+          <p class="section-hint" id="unfamiliar-count">目前沒有不熟項目，保持加油！</p>
+          <div id="unfamiliar-pool" class="unfamiliar-pool"></div>
+          <div class="page-actions">
+            <button id="start-unfamiliar-practice" class="primary-button">專練不熟題</button>
+          </div>
+          <p class="section-hint">錯題會自動加入。連續答對 5 次就會從排行與資料庫中消失。</p>
+        </details>
+
+        <details>
+          <summary>更多工具</summary>
+          <button id="reset-progress" class="ghost-button">清除紀錄</button>
+          <p class="section-hint">清除後會重置闖關、紀錄與不熟資料。</p>
+        </details>
       </section>
     </main>
 

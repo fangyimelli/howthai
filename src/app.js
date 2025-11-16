@@ -1,5 +1,11 @@
 import { categories, learningItems, itemMap } from './data.js';
 
+const stageFlow = [
+  { id: 'consonant', label: '子音關卡', categories: ['consonant'] },
+  { id: 'vowel', label: '母音 / 音調關卡', categories: ['vowel', 'tone'] },
+  { id: 'word', label: '單字關卡', categories: ['word'] }
+];
+
 const elements = {
   categoryLabel: document.getElementById('category-label'),
   progressIndicator: document.getElementById('progress-indicator'),
@@ -9,6 +15,7 @@ const elements = {
   playAudio: document.getElementById('play-audio'),
   prev: document.getElementById('prev-card'),
   next: document.getElementById('next-card'),
+  stageProgress: document.getElementById('stage-progress'),
   toggles: {
     consonant: document.getElementById('toggle-consonant'),
     vowel: document.getElementById('toggle-vowel'),
@@ -23,6 +30,7 @@ const elements = {
 
 const localStorageKey = 'thai-learning-progress';
 const manualStorageKey = 'thai-learning-manual-unfamiliar';
+const stageStorageKey = 'thai-learning-stage-gate';
 const categoryOrder = Object.fromEntries(categories.map((category, index) => [category.id, index]));
 
 const state = {
@@ -34,6 +42,7 @@ const state = {
   showBreakdown: false,
   progress: loadProgress(),
   manualUnfamiliar: loadManualUnfamiliar(),
+  stageGate: loadStageGate(),
   filters: new Set(categories.map((c) => c.id))
 };
 
@@ -52,6 +61,58 @@ function saveManualUnfamiliar() {
     localStorage.setItem(manualStorageKey, JSON.stringify(Array.from(state.manualUnfamiliar)));
   } catch (error) {
     console.warn('無法儲存不熟資料庫', error);
+  }
+}
+
+function createStageStats() {
+  return stageFlow.reduce((stats, stage) => {
+    stats[stage.id] = {
+      attempts: 0,
+      correct: 0,
+      consecutive: 0,
+      passed: false
+    };
+    return stats;
+  }, {});
+}
+
+function determineCurrentStage(stats) {
+  const pending = stageFlow.find((stage) => !stats[stage.id]?.passed);
+  return pending ? pending.id : stageFlow[stageFlow.length - 1].id;
+}
+
+function loadStageGate() {
+  const defaults = {
+    stats: createStageStats(),
+    currentStage: stageFlow[0].id
+  };
+  try {
+    const cached = localStorage.getItem(stageStorageKey);
+    if (!cached) {
+      defaults.currentStage = determineCurrentStage(defaults.stats);
+      return defaults;
+    }
+    const parsed = JSON.parse(cached);
+    stageFlow.forEach((stage) => {
+      defaults.stats[stage.id] = {
+        ...defaults.stats[stage.id],
+        ...(parsed.stats?.[stage.id] ?? {})
+      };
+    });
+    defaults.currentStage = determineCurrentStage(defaults.stats);
+    return defaults;
+  } catch (error) {
+    console.warn('無法讀取闖關紀錄，使用預設值', error);
+    defaults.currentStage = determineCurrentStage(defaults.stats);
+    return defaults;
+  }
+}
+
+function saveStageGate() {
+  try {
+    localStorage.setItem(stageStorageKey, JSON.stringify(state.stageGate));
+  } catch (error) {
+    console.warn('無法儲存闖關紀錄', error);
   }
 }
 
@@ -89,6 +150,109 @@ function saveProgress() {
   }
 }
 
+function stageForCategory(categoryId) {
+  return stageFlow.find((stage) => stage.categories.includes(categoryId))?.id;
+}
+
+function allowedCategoriesFromStage() {
+  const allowed = new Set();
+  stageFlow.forEach((stage) => {
+    if (state.stageGate.stats[stage.id]?.passed || stage.id === state.stageGate.currentStage) {
+      stage.categories.forEach((category) => allowed.add(category));
+    }
+  });
+  return allowed;
+}
+
+function ensureCurrentItemAllowed() {
+  if (!state.currentItem) return;
+  if (!allowedCategoriesFromStage().has(state.currentItem.category)) {
+    selectNextItem();
+  }
+}
+
+function syncToggleStates() {
+  const allowed = allowedCategoriesFromStage();
+  Object.entries(elements.toggles).forEach(([key, checkbox]) => {
+    const wasDisabled = checkbox.disabled;
+    const isAllowed = allowed.has(key);
+    checkbox.disabled = !isAllowed;
+    if (!isAllowed) {
+      checkbox.checked = false;
+      state.filters.delete(key);
+    } else if (wasDisabled && isAllowed) {
+      checkbox.checked = true;
+      state.filters.add(key);
+    }
+  });
+}
+
+function renderStageProgress() {
+  if (!elements.stageProgress) return;
+  elements.stageProgress.innerHTML = '';
+  const currentStageId = state.stageGate.currentStage;
+
+  stageFlow.forEach((stage) => {
+    const stats = state.stageGate.stats[stage.id];
+    const accuracy = stats.attempts ? Math.round((stats.correct / stats.attempts) * 100) : 0;
+
+    const row = document.createElement('div');
+    row.className = 'stage-row';
+    row.dataset.status = stats.passed ? 'passed' : stage.id === currentStageId ? 'current' : 'locked';
+
+    const header = document.createElement('div');
+    header.className = 'stage-row-header';
+
+    const title = document.createElement('div');
+    title.className = 'stage-title';
+    title.textContent = stage.label;
+
+    const badge = document.createElement('span');
+    badge.className = 'stage-badge';
+    badge.textContent =
+      stats.passed ? '已解鎖' : stage.id === currentStageId ? '進行中' : '未解鎖';
+
+    header.append(title, badge);
+
+    const statsLine = document.createElement('p');
+    statsLine.className = 'stage-row-stats';
+    statsLine.textContent = `正確率 ${accuracy}% · 連續正確 ${stats.consecutive} 題`;
+
+    row.append(header, statsLine);
+    elements.stageProgress.appendChild(row);
+  });
+}
+
+function updateStageGate(categoryId, isCorrect) {
+  const stageId = stageForCategory(categoryId);
+  if (!stageId) return;
+  const stats = state.stageGate.stats[stageId];
+  const stageMeta = stageFlow.find((stage) => stage.id === stageId);
+  stats.attempts += 1;
+  if (isCorrect) {
+    stats.correct += 1;
+    stats.consecutive += 1;
+  } else {
+    stats.consecutive = 0;
+  }
+
+  const accuracy = stats.attempts ? stats.correct / stats.attempts : 0;
+  let unlockedStage = null;
+  if (!stats.passed && accuracy >= 0.8 && stats.consecutive >= 10) {
+    stats.passed = true;
+    state.stageGate.currentStage = determineCurrentStage(state.stageGate.stats);
+    unlockedStage = stageMeta;
+  }
+
+  saveStageGate();
+  renderStageProgress();
+  syncToggleStates();
+  ensureCurrentItemAllowed();
+  if (unlockedStage) {
+    showFeedback(`恭喜通過${unlockedStage.label}，下一關已解鎖！`, true);
+  }
+}
+
 function getStats(id) {
   if (!state.progress[id]) {
     state.progress[id] = { attempts: 0, correct: 0, incorrect: 0, score: 0 };
@@ -99,6 +263,12 @@ function getStats(id) {
 function goToItem(itemId, pushHistory = true) {
   const item = itemMap[itemId];
   if (!item) return;
+  if (!allowedCategoriesFromStage().has(item.category)) {
+    const stageId = stageForCategory(item.category);
+    const stageMeta = stageFlow.find((stage) => stage.id === stageId);
+    alert(`請先完成${stageMeta?.label ?? '上一關'}，才能練習這個題型。`);
+    return;
+  }
   state.currentItem = item;
   state.stage = 'quiz';
   state.promptOverride = '';
@@ -113,28 +283,33 @@ function goToItem(itemId, pushHistory = true) {
   renderCard();
 }
 
-function recordResult(itemId, isCorrect) {
-  const stats = getStats(itemId);
+function recordResult(item, isCorrect) {
+  const stats = getStats(item.id);
   stats.attempts += 1;
   if (isCorrect) {
     stats.correct += 1;
     stats.score = Math.min(
       stats.score + 1,
-      (itemMap[itemId]?.masteryGoal ?? 5)
+      (itemMap[item.id]?.masteryGoal ?? 5)
     );
   } else {
     stats.incorrect += 1;
     stats.score = Math.max(stats.score - 1, 0);
   }
-  state.progress[itemId] = stats;
+  state.progress[item.id] = stats;
   saveProgress();
   updateTroubleList();
+  updateStageGate(item.category, isCorrect);
 }
 
 function filteredItems() {
-  const allowed = Array.from(state.filters);
-  const pool = learningItems.filter((item) => allowed.includes(item.category));
-  return pool.length ? pool : learningItems;
+  const gateAllowed = allowedCategoriesFromStage();
+  const pool = learningItems.filter(
+    (item) => gateAllowed.has(item.category) && state.filters.has(item.category)
+  );
+  if (pool.length) return pool;
+  const fallback = learningItems.filter((item) => gateAllowed.has(item.category));
+  return fallback.length ? fallback : learningItems;
 }
 
 function computeWeight(item) {
@@ -148,6 +323,9 @@ function computeWeight(item) {
 
 function pickWeightedItem(excludeId) {
   const pool = filteredItems();
+  if (!pool.length) {
+    return learningItems[0];
+  }
   const weights = pool.map((item) => {
     const weight = computeWeight(item) * (item.id === excludeId ? 0.5 : 1);
     return weight;
@@ -165,7 +343,10 @@ function pickWeightedItem(excludeId) {
 }
 
 function generateOptions(item) {
-  const pool = filteredItems().filter((candidate) => candidate.category === item.category);
+  const gateAllowed = allowedCategoriesFromStage();
+  const pool = learningItems.filter(
+    (candidate) => candidate.category === item.category && gateAllowed.has(candidate.category)
+  );
   const distractors = pool.filter((candidate) => candidate.id !== item.id);
   const selected = new Set([item.transliteration]);
   while (selected.size < 3 && distractors.length) {
@@ -306,7 +487,7 @@ function handleOption(selectedText, button) {
   const isCorrect = selectedText === item.transliteration;
   disableQuestionButtons();
   button.classList.add(isCorrect ? 'correct' : 'incorrect');
-  recordResult(item.id, isCorrect);
+  recordResult(item, isCorrect);
 
   if (isCorrect) {
     showFeedback('太棒了！繼續下一題。', true);
@@ -464,7 +645,16 @@ function resetProgress() {
   if (!confirm('確定要清除全部紀錄嗎？')) return;
   state.progress = {};
   saveProgress();
+  state.stageGate = {
+    stats: createStageStats(),
+    currentStage: stageFlow[0].id
+  };
+  state.stageGate.currentStage = determineCurrentStage(state.stageGate.stats);
+  saveStageGate();
   updateTroubleList();
+  renderStageProgress();
+  syncToggleStates();
+  ensureCurrentItemAllowed();
   renderCard();
 }
 
@@ -477,8 +667,11 @@ function initToggles() {
         state.filters.delete(key);
       }
       if (state.filters.size === 0) {
-        categories.forEach((category) => state.filters.add(category.id));
-        Object.values(elements.toggles).forEach((toggle) => (toggle.checked = true));
+        allowedCategoriesFromStage().forEach((categoryId) => {
+          state.filters.add(categoryId);
+          const toggle = elements.toggles[categoryId];
+          if (toggle) toggle.checked = true;
+        });
       }
       if (!state.filters.has(state.currentItem.category)) {
         selectNextItem();
@@ -498,7 +691,10 @@ elements.prev.addEventListener('click', () => {
 elements.resetButton.addEventListener('click', resetProgress);
 
 initToggles();
+syncToggleStates();
 updateTroubleList();
 renderAlphabetList();
 updateManualList();
+renderStageProgress();
+ensureCurrentItemAllowed();
 renderCard();

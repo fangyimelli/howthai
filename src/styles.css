@@ -167,6 +167,70 @@ button:not(.ghost-button) {
   margin-top: 0;
 }
 
+.stage-panel {
+  border-bottom: 1px dashed var(--border);
+  margin-bottom: 1.25rem;
+  padding-bottom: 1.25rem;
+}
+
+.stage-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.stage-row {
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 0.75rem 1rem;
+  background: rgba(15, 23, 42, 0.6);
+  transition: border 150ms ease, transform 150ms ease;
+}
+
+.stage-row[data-status='current'] {
+  border-color: #fbbf24;
+  box-shadow: 0 10px 25px rgba(251, 191, 36, 0.15);
+}
+
+.stage-row[data-status='passed'] {
+  border-color: #34d399;
+}
+
+.stage-row[data-status='locked'] {
+  opacity: 0.6;
+}
+
+.stage-row-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.35rem;
+}
+
+.stage-title {
+  font-weight: 600;
+}
+
+.stage-badge {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+.stage-row[data-status='passed'] .stage-badge {
+  color: #34d399;
+}
+
+.stage-row[data-status='current'] .stage-badge {
+  color: #fbbf24;
+}
+
+.stage-row-stats {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
 .alphabet-panel {
   border-top: 1px dashed var(--border);
   margin-top: 1.5rem;

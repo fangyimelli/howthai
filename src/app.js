@@ -24,8 +24,13 @@ const elements = {
   },
   troubleList: document.getElementById('trouble-list'),
   alphabetList: document.getElementById('alphabet-list'),
-  manualList: document.getElementById('manual-list'),
-  resetButton: document.getElementById('reset-progress')
+  unfamiliarPool: document.getElementById('unfamiliar-pool'),
+  resetButton: document.getElementById('reset-progress'),
+  startAlphabetPractice: document.getElementById('start-alphabet-practice'),
+  startUnfamiliarPractice: document.getElementById('start-unfamiliar-practice'),
+  navButtons: document.querySelectorAll('[data-view-target]'),
+  views: document.querySelectorAll('.view'),
+  customIndicator: document.getElementById('custom-indicator')
 };
 
 const localStorageKey = 'thai-learning-progress';
@@ -43,7 +48,13 @@ const state = {
   progress: loadProgress(),
   manualUnfamiliar: loadManualUnfamiliar(),
   stageGate: loadStageGate(),
-  filters: new Set(categories.map((c) => c.id))
+  filters: new Set(categories.map((c) => c.id)),
+  view: 'practice',
+  mode: 'gate',
+  customPool: [],
+  customLabel: '',
+  customStats: { attempts: 0, correct: 0, consecutive: 0 },
+  troubleIds: []
 };
 
 function loadManualUnfamiliar() {
@@ -116,6 +127,88 @@ function saveStageGate() {
   }
 }
 
+function switchView(viewId) {
+  state.view = viewId;
+  if (elements.views) {
+    elements.views.forEach((view) => {
+      view.classList.toggle('active', view.dataset.view === viewId);
+    });
+  }
+  if (elements.navButtons) {
+    elements.navButtons.forEach((button) => {
+      button.classList.toggle('active', button.dataset.viewTarget === viewId);
+    });
+  }
+}
+
+function renderCustomIndicator() {
+  if (!elements.customIndicator) return;
+  if (state.mode !== 'custom') {
+    elements.customIndicator.dataset.active = 'false';
+    elements.customIndicator.textContent = '目前為闖關模式。';
+    return;
+  }
+  const accuracy = state.customStats.attempts
+    ? Math.round((state.customStats.correct / state.customStats.attempts) * 100)
+    : 0;
+  elements.customIndicator.dataset.active = 'true';
+  elements.customIndicator.textContent = `${state.customLabel || '自選練習中'} · 正確率 ${accuracy}% · 連續正確 ${state.customStats.consecutive}`;
+}
+
+function startCustomSession(itemIds, label = '自選練習') {
+  const pool = Array.from(new Set(itemIds))
+    .map((id) => itemMap[id])
+    .filter(Boolean);
+  if (!pool.length) {
+    alert('請先勾選至少一個項目。');
+    return;
+  }
+  state.mode = 'custom';
+  state.customPool = pool.map((item) => item.id);
+  state.customLabel = label;
+  state.customStats = { attempts: 0, correct: 0, consecutive: 0 };
+  renderCustomIndicator();
+  switchView('practice');
+  const startId = state.customPool[Math.floor(Math.random() * state.customPool.length)];
+  goToItem(startId, true);
+}
+
+function endCustomSession(completed = false) {
+  if (state.mode !== 'custom') return;
+  state.mode = 'gate';
+  state.customPool = [];
+  state.customLabel = '';
+  state.customStats = { attempts: 0, correct: 0, consecutive: 0 };
+  renderCustomIndicator();
+  ensureCurrentItemAllowed();
+  if (completed) {
+    showFeedback('自選練習達標，返回闖關模式！', true);
+  }
+}
+
+function updateCustomStats(isCorrect) {
+  state.customStats.attempts += 1;
+  if (isCorrect) {
+    state.customStats.correct += 1;
+    state.customStats.consecutive += 1;
+  } else {
+    state.customStats.consecutive = 0;
+  }
+  renderCustomIndicator();
+  const accuracy = state.customStats.attempts
+    ? state.customStats.correct / state.customStats.attempts
+    : 0;
+  if (accuracy >= 0.8 && state.customStats.consecutive >= 10) {
+    endCustomSession(true);
+  }
+}
+
+function gatherUnfamiliarIds() {
+  const ids = new Set(state.troubleIds);
+  state.manualUnfamiliar.forEach((id) => ids.add(id));
+  return Array.from(ids);
+}
+
 function setManualFlag(itemId, shouldAdd, row) {
   if (shouldAdd) {
     state.manualUnfamiliar.add(itemId);
@@ -126,7 +219,7 @@ function setManualFlag(itemId, shouldAdd, row) {
     row.dataset.flagged = shouldAdd ? 'true' : 'false';
   }
   saveManualUnfamiliar();
-  updateManualList();
+  renderUnfamiliarPool();
   if (!row) {
     renderAlphabetList();
   }
@@ -166,6 +259,7 @@ function allowedCategoriesFromStage() {
 
 function ensureCurrentItemAllowed() {
   if (!state.currentItem) return;
+  if (state.mode === 'custom') return;
   if (!allowedCategoriesFromStage().has(state.currentItem.category)) {
     selectNextItem();
   }
@@ -255,7 +349,10 @@ function updateStageGate(categoryId, isCorrect) {
 
 function getStats(id) {
   if (!state.progress[id]) {
-    state.progress[id] = { attempts: 0, correct: 0, incorrect: 0, score: 0 };
+    state.progress[id] = { attempts: 0, correct: 0, incorrect: 0, score: 0, streak: 0 };
+  }
+  if (typeof state.progress[id].streak !== 'number') {
+    state.progress[id].streak = 0;
   }
   return state.progress[id];
 }
@@ -263,7 +360,7 @@ function getStats(id) {
 function goToItem(itemId, pushHistory = true) {
   const item = itemMap[itemId];
   if (!item) return;
-  if (!allowedCategoriesFromStage().has(item.category)) {
+  if (state.mode !== 'custom' && !allowedCategoriesFromStage().has(item.category)) {
     const stageId = stageForCategory(item.category);
     const stageMeta = stageFlow.find((stage) => stage.id === stageId);
     alert(`請先完成${stageMeta?.label ?? '上一關'}，才能練習這個題型。`);
@@ -288,21 +385,30 @@ function recordResult(item, isCorrect) {
   stats.attempts += 1;
   if (isCorrect) {
     stats.correct += 1;
+    stats.streak += 1;
     stats.score = Math.min(
       stats.score + 1,
       (itemMap[item.id]?.masteryGoal ?? 5)
     );
   } else {
     stats.incorrect += 1;
+    stats.streak = 0;
     stats.score = Math.max(stats.score - 1, 0);
   }
   state.progress[item.id] = stats;
   saveProgress();
   updateTroubleList();
-  updateStageGate(item.category, isCorrect);
+  if (state.mode === 'custom') {
+    updateCustomStats(isCorrect);
+  } else {
+    updateStageGate(item.category, isCorrect);
+  }
 }
 
 function filteredItems() {
+  if (state.mode === 'custom') {
+    return state.customPool.map((id) => itemMap[id]).filter(Boolean);
+  }
   const gateAllowed = allowedCategoriesFromStage();
   const pool = learningItems.filter(
     (item) => gateAllowed.has(item.category) && state.filters.has(item.category)
@@ -343,9 +449,10 @@ function pickWeightedItem(excludeId) {
 }
 
 function generateOptions(item) {
-  const gateAllowed = allowedCategoriesFromStage();
+  const gateAllowed = state.mode === 'custom' ? null : allowedCategoriesFromStage();
   const pool = learningItems.filter(
-    (candidate) => candidate.category === item.category && gateAllowed.has(candidate.category)
+    (candidate) =>
+      candidate.category === item.category && (state.mode === 'custom' || gateAllowed.has(candidate.category))
   );
   const distractors = pool.filter((candidate) => candidate.id !== item.id);
   const selected = new Set([item.transliteration]);
@@ -519,6 +626,10 @@ function showFeedback(text, positive = false) {
 }
 
 function selectNextItem() {
+  if (state.mode === 'custom' && state.customPool.length === 0) {
+    endCustomSession(false);
+    return;
+  }
   const nextItem = pickWeightedItem(state.currentItem?.id);
   goToItem(nextItem.id, true);
 }
@@ -530,18 +641,30 @@ function updateTroubleList() {
       const accuracy = stats.attempts ? stats.correct / stats.attempts : 1;
       return { item, stats, accuracy };
     })
-    .filter(({ stats }) => stats.attempts > 0)
+    .filter(({ stats }) => stats.attempts > 0 && (stats.streak ?? 0) < 5)
     .sort((a, b) => a.accuracy - b.accuracy || b.stats.attempts - a.stats.attempts)
-    .slice(0, 5);
+    .slice(0, 8);
 
-  elements.troubleList.innerHTML = '';
-  itemsWithStats.forEach(({ item, stats, accuracy }) => {
-    const li = document.createElement('li');
-    const percent = Math.round(accuracy * 100);
-    li.textContent = `${item.thai} · ${percent}% 正確 · 錯 ${stats.incorrect}`;
-    li.addEventListener('click', () => goToItem(item.id, true));
-    elements.troubleList.appendChild(li);
-  });
+  state.troubleIds = itemsWithStats.map(({ item }) => item.id);
+
+  if (elements.troubleList) {
+    elements.troubleList.innerHTML = '';
+    if (!itemsWithStats.length) {
+      const empty = document.createElement('li');
+      empty.textContent = '目前沒有系統偵測的不熟項目。';
+      elements.troubleList.appendChild(empty);
+    } else {
+      itemsWithStats.forEach(({ item, stats, accuracy }) => {
+        const li = document.createElement('li');
+        const percent = Math.round(accuracy * 100);
+        const needed = Math.max(0, 5 - (stats.streak ?? 0));
+        li.textContent = `${item.thai} · ${percent}% 正確 · 連對 ${stats.streak ?? 0}/5 (還需 ${needed})`;
+        li.addEventListener('click', () => startCustomSession([item.id], `${item.thai} 集中練習`));
+        elements.troubleList.appendChild(li);
+      });
+    }
+  }
+  renderUnfamiliarPool();
 }
 
 function renderAlphabetList() {
@@ -594,51 +717,101 @@ function renderAlphabetList() {
   });
 }
 
-function updateManualList() {
-  if (!elements.manualList) return;
-  elements.manualList.innerHTML = '';
+function renderUnfamiliarPool() {
+  if (!elements.unfamiliarPool) return;
+  elements.unfamiliarPool.innerHTML = '';
 
-  if (!state.manualUnfamiliar.size) {
+  const entryMap = new Map();
+
+  state.manualUnfamiliar.forEach((id) => {
+    const item = itemMap[id];
+    if (!item) return;
+    entryMap.set(id, { item, sources: ['manual'], stats: getStats(id) });
+  });
+
+  state.troubleIds.forEach((id) => {
+    const item = itemMap[id];
+    if (!item) return;
+    const existing = entryMap.get(id);
+    const stats = getStats(id);
+    if (existing) {
+      if (!existing.sources.includes('trouble')) {
+        existing.sources.push('trouble');
+      }
+      existing.stats = stats;
+    } else {
+      entryMap.set(id, { item, sources: ['trouble'], stats });
+    }
+  });
+
+  if (!entryMap.size) {
     const empty = document.createElement('p');
     empty.className = 'empty-state';
-    empty.textContent = '目前沒有標記的不熟項目。';
-    elements.manualList.appendChild(empty);
+    empty.textContent = '目前沒有不熟項目。';
+    elements.unfamiliarPool.appendChild(empty);
     return;
   }
 
-  const items = Array.from(state.manualUnfamiliar)
-    .map((id) => itemMap[id])
-    .filter(Boolean)
+  Array.from(entryMap.values())
     .sort(
       (a, b) =>
-        (categoryOrder[a.category] ?? 0) - (categoryOrder[b.category] ?? 0) ||
-        a.thai.localeCompare(b.thai)
-    );
+        (categoryOrder[a.item.category] ?? 0) - (categoryOrder[b.item.category] ?? 0) ||
+        a.item.thai.localeCompare(b.item.thai)
+    )
+    .forEach(({ item, sources, stats }) => {
+      const entry = document.createElement('div');
+      entry.className = 'unfamiliar-entry';
 
-  items.forEach((item) => {
-    const entry = document.createElement('div');
-    entry.className = 'manual-entry';
+      const info = document.createElement('div');
+      info.className = 'unfamiliar-info';
 
-    const info = document.createElement('div');
-    info.innerHTML = `<strong>${item.thai}</strong>`;
+      const titleRow = document.createElement('div');
+      titleRow.style.display = 'flex';
+      titleRow.style.alignItems = 'center';
+      titleRow.style.gap = '0.35rem';
 
-    const actions = document.createElement('div');
-    actions.className = 'manual-actions';
+      const title = document.createElement('strong');
+      title.textContent = item.thai;
+      titleRow.appendChild(title);
 
-    const review = document.createElement('button');
-    review.className = 'ghost-button mini-button';
-    review.textContent = '練習';
-    review.addEventListener('click', () => goToItem(item.id, true));
+      sources.forEach((source) => {
+        const tag = document.createElement('span');
+        tag.className = 'tag';
+        tag.dataset.type = source === 'manual' ? 'manual' : 'trouble';
+        tag.textContent = source === 'manual' ? '手動' : '系統';
+        titleRow.appendChild(tag);
+      });
 
-    const remove = document.createElement('button');
-    remove.className = 'ghost-button mini-button';
-    remove.textContent = '移除';
-    remove.addEventListener('click', () => setManualFlag(item.id, false));
+      info.appendChild(titleRow);
 
-    actions.append(review, remove);
-    entry.append(info, actions);
-    elements.manualList.appendChild(entry);
-  });
+      if (sources.includes('trouble')) {
+        const needed = Math.max(0, 5 - (stats.streak ?? 0));
+        const reminder = document.createElement('span');
+        reminder.className = 'reminder-text';
+        reminder.textContent = `再連對 ${needed} 題即可自動移除`;
+        info.appendChild(reminder);
+      }
+
+      const actions = document.createElement('div');
+      actions.className = 'unfamiliar-actions';
+
+      const practice = document.createElement('button');
+      practice.className = 'ghost-button mini-button';
+      practice.textContent = '立即練習';
+      practice.addEventListener('click', () => startCustomSession([item.id], `${item.thai} 自選練習`));
+      actions.appendChild(practice);
+
+      if (sources.includes('manual')) {
+        const remove = document.createElement('button');
+        remove.className = 'ghost-button mini-button';
+        remove.textContent = '移除';
+        remove.addEventListener('click', () => setManualFlag(item.id, false));
+        actions.appendChild(remove);
+      }
+
+      entry.append(info, actions);
+      elements.unfamiliarPool.appendChild(entry);
+    });
 }
 
 function resetProgress() {
@@ -690,11 +863,25 @@ elements.prev.addEventListener('click', () => {
 });
 elements.resetButton.addEventListener('click', resetProgress);
 
+elements.startAlphabetPractice?.addEventListener('click', () =>
+  startCustomSession(Array.from(state.manualUnfamiliar), '字母 / 音標自選練習')
+);
+elements.startUnfamiliarPractice?.addEventListener('click', () =>
+  startCustomSession(gatherUnfamiliarIds(), '不熟項目練習')
+);
+
+if (elements.navButtons) {
+  elements.navButtons.forEach((button) => {
+    button.addEventListener('click', () => switchView(button.dataset.viewTarget));
+  });
+}
+
 initToggles();
 syncToggleStates();
 updateTroubleList();
 renderAlphabetList();
-updateManualList();
 renderStageProgress();
 ensureCurrentItemAllowed();
 renderCard();
+switchView('practice');
+renderCustomIndicator();

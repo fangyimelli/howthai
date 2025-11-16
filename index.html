@@ -15,7 +15,6 @@
         <div class="hero-cta">
           <button id="hero-cta" class="primary-button">開始練習</button>
           <p id="hero-hint" class="hero-hint">準備好闖關，先從子音開始！</p>
-          <p id="daily-reminder" class="hero-reminder" hidden>今天目標：做完 1 關子音，或 30 題隨機練習</p>
         </div>
       </div>
     </header>
@@ -32,6 +31,7 @@
               <span class="badge" id="category-label"></span>
               <span class="phonetic" id="phonetic-label" data-revealed="false">音標：？</span>
             </div>
+            <p id="card-status" class="card-status">第 1 題｜本輪正確率 0%｜今天已完成 0 題</p>
             <h2 id="thai-script"></h2>
             <p id="mnemonic" class="mnemonic"></p>
             <div id="question-area" class="question-area"></div>
@@ -44,49 +44,48 @@
           </div>
         </article>
 
-        <aside class="stage-widget">
-          <div class="stage-header">
-            <div>
-              <h3>本關進度</h3>
-              <p id="stage-subtitle" class="stage-subtitle">子音關卡</p>
+        <aside class="side-column">
+          <section class="side-card mission-card" id="mission-card">
+            <div class="mission-header">
+              <h3>今天任務</h3>
+              <span id="mission-streak">你已連續練習 0 天 🔥</span>
             </div>
-            <button id="drill-unfamiliar" class="pill-button">啟動修羅場模式</button>
-          </div>
-          <div class="stage-meter">
-            <div class="meter-label">正確率 80% 達標</div>
-            <div class="meter-track">
-              <div class="meter-fill" id="accuracy-fill"></div>
+            <p id="mission-goal" class="mission-line">🎯 關卡目標：子音第 1 關破關（正確率 ≥ 80%＋連擊 10）</p>
+            <p class="mission-line">📊 今日任務：完成 30 題練習</p>
+            <p id="mission-progress" class="mission-progress">進度：已完成 0 / 30 題，正確率 0%</p>
+            <p id="mission-note" class="mission-note">今天目標：做完 1 關子音，或 30 題隨機練習</p>
+          </section>
+
+          <section class="side-card stage-widget">
+            <div class="stage-header">
+              <div>
+                <h3>本關進度</h3>
+                <p id="stage-subtitle" class="stage-subtitle">子音關卡</p>
+              </div>
             </div>
-            <p id="accuracy-label" class="meter-value">0% / 80%</p>
-            <div class="stage-star" id="stage-star" data-active="false">集滿條件就能點亮星星</div>
-          </div>
-          <div class="combo-line">
-            <p>連擊</p>
-            <div id="combo-value" class="combo-value">0 / 10 🔥</div>
-          </div>
-          <div id="stage-celebration" class="stage-celebration" hidden>
-            <p>✅ 恭喜破關！下一關已解鎖</p>
-            <button id="celebration-continue" class="primary-button">前往下一關</button>
-          </div>
-          <div class="stage-roadmap" id="stage-roadmap"></div>
-          <div id="custom-indicator" class="custom-indicator">目前為闖關模式。</div>
-          <section class="trouble-highlight">
+            <div class="stage-meter">
+              <div class="meter-label">正確率 80% 達標</div>
+              <div class="meter-track">
+                <div class="meter-fill" id="accuracy-fill"></div>
+              </div>
+              <p id="accuracy-label" class="meter-value">0% / 80%</p>
+              <div class="stage-star" id="stage-star" data-active="false">集滿條件就能點亮星星</div>
+            </div>
+            <div class="combo-line">
+              <p>連擊</p>
+              <div id="combo-value" class="combo-value">0 / 10 🔥</div>
+            </div>
+            <div id="stage-celebration" class="stage-celebration" hidden>
+              <p>✅ 恭喜破關！下一關已解鎖</p>
+              <button id="celebration-continue" class="primary-button">前往下一關</button>
+            </div>
+            <div class="stage-roadmap" id="stage-roadmap"></div>
+            <div id="custom-indicator" class="custom-indicator">目前為闖關模式。</div>
+          </section>
+
+          <section class="side-card trouble-highlight" id="trouble-section" hidden>
             <h4>今天最調皮的字母 😈</h4>
             <ol id="trouble-list"></ol>
-          </section>
-          <section class="daily-widget" id="daily-widget">
-            <div class="daily-header">
-              <h4>每日進步</h4>
-              <span id="daily-streak" class="daily-streak">你已連續練習 0 天 🔥</span>
-            </div>
-            <p class="section-hint">今日目標：完成 30 題／正確率 ≥ 70%</p>
-            <div class="daily-meter">
-              <div class="meter-track">
-                <div class="meter-fill" id="daily-meter-fill"></div>
-              </div>
-              <p id="daily-meter-label" class="meter-value">已完成 0 / 30 題</p>
-            </div>
-            <p id="daily-accuracy-label" class="daily-accuracy">正確率 0% / 70%</p>
           </section>
         </aside>
       </section>
@@ -99,7 +98,7 @@
 
       <section class="details-grid">
         <details>
-          <summary>題型標籤＋建議路線</summary>
+          <summary>題目類型</summary>
           <p class="section-hint">依序練：子音 → 母音 → 音調 → 單字。若直接選單字，我們會提醒你先打好基礎。</p>
           <div id="mode-tabs" class="mode-tabs"></div>
           <p id="mode-tip" class="section-hint"></p>

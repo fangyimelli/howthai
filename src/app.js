@@ -23,10 +23,10 @@ const stageFlow = [
 const elements = {
   heroCta: document.getElementById('hero-cta'),
   heroHint: document.getElementById('hero-hint'),
-  dailyReminder: document.getElementById('daily-reminder'),
   card: document.getElementById('learning-card'),
   categoryLabel: document.getElementById('category-label'),
   phoneticLabel: document.getElementById('phonetic-label'),
+  cardStatus: document.getElementById('card-status'),
   thaiScript: document.getElementById('thai-script'),
   mnemonic: document.getElementById('mnemonic'),
   questionArea: document.getElementById('question-area'),
@@ -54,12 +54,11 @@ const elements = {
   modeTip: document.getElementById('mode-tip'),
   visualSymbol: document.getElementById('visual-symbol'),
   visualOrbit: document.getElementById('visual-orbit'),
-  drillUnfamiliar: document.getElementById('drill-unfamiliar'),
-  dailyMeterFill: document.getElementById('daily-meter-fill'),
-  dailyMeterLabel: document.getElementById('daily-meter-label'),
-  dailyAccuracyLabel: document.getElementById('daily-accuracy-label'),
-  dailyStreak: document.getElementById('daily-streak'),
-  dailyWidget: document.getElementById('daily-widget')
+  missionGoal: document.getElementById('mission-goal'),
+  missionProgress: document.getElementById('mission-progress'),
+  missionStreak: document.getElementById('mission-streak'),
+  missionNote: document.getElementById('mission-note'),
+  troubleSection: document.getElementById('trouble-section')
 };
 
 const localStorageKey = 'thai-learning-progress';
@@ -93,8 +92,6 @@ const state = {
   previousCombo: 0,
   recentUnlock: null
 };
-
-let dailyReminderTimeout = null;
 
 function loadManualUnfamiliar() {
   try {
@@ -183,8 +180,7 @@ function createDailyProgress() {
     attempts: 0,
     correct: 0,
     streak: 0,
-    lastPracticeDate: null,
-    reminderDate: null
+    lastPracticeDate: null
   };
 }
 
@@ -238,25 +234,25 @@ function renderCustomIndicator() {
   elements.customIndicator.textContent = `${prefix} · 正確率 ${accuracy}% · 連續正確 ${state.customStats.consecutive}`;
 }
 
-function renderDailyWidget() {
-  if (!elements.dailyWidget) return;
+function renderTodayMission() {
+  if (!elements.missionGoal) return;
+  const currentStageId = state.stageGate.currentStage;
+  const stageMeta = stageFlow.find((stage) => stage.id === currentStageId);
+  const stageLabel = stageMeta?.label ?? '全部完成';
+  elements.missionGoal.textContent = `🎯 關卡目標：${stageLabel}（正確率 ≥ 80%＋連擊 10）`;
+
   const { attempts, correct, streak } = state.dailyProgress;
   const accuracy = attempts ? Math.round((correct / attempts) * 100) : 0;
-  const progressPercent = Math.min((attempts / dailyGoal.attempts) * 100, 100);
-  if (elements.dailyMeterFill) {
-    elements.dailyMeterFill.style.width = `${progressPercent}%`;
+  elements.missionProgress.textContent = `進度：已完成 ${attempts} / ${dailyGoal.attempts} 題，正確率 ${accuracy}%`;
+
+  if (elements.missionStreak) {
+    elements.missionStreak.textContent = `你已連續練習 ${streak} 天 🔥`;
   }
-  if (elements.dailyMeterLabel) {
-    elements.dailyMeterLabel.textContent = `已完成 ${attempts} / ${dailyGoal.attempts} 題`;
+  if (elements.missionNote) {
+    const firstStage = stageFlow[0];
+    const stageText = firstStage?.label?.replace('關卡', '') ?? '子音';
+    elements.missionNote.textContent = `今天目標：做完 1 關${stageText}，或 30 題隨機練習`;
   }
-  if (elements.dailyAccuracyLabel) {
-    elements.dailyAccuracyLabel.textContent = `正確率 ${accuracy}% / ${dailyGoal.accuracy}%`;
-  }
-  if (elements.dailyStreak) {
-    elements.dailyStreak.textContent = `你已連續練習 ${streak} 天 🔥`;
-  }
-  const complete = attempts >= dailyGoal.attempts && accuracy >= dailyGoal.accuracy;
-  elements.dailyWidget.dataset.complete = complete ? 'true' : 'false';
 }
 
 function updateDailyProgress(isCorrect) {
@@ -282,24 +278,8 @@ function updateDailyProgress(isCorrect) {
     state.dailyProgress.correct += 1;
   }
   saveDailyProgress();
-  renderDailyWidget();
-}
-
-function maybeShowDailyReminder() {
-  if (!elements.dailyReminder) return;
-  const today = getTodayKey();
-  if (state.dailyProgress.reminderDate === today) return;
-  state.dailyProgress.reminderDate = today;
-  saveDailyProgress();
-  elements.dailyReminder.hidden = false;
-  elements.dailyReminder.classList.add('show');
-  clearTimeout(dailyReminderTimeout);
-  dailyReminderTimeout = setTimeout(() => {
-    if (elements.dailyReminder) {
-      elements.dailyReminder.hidden = true;
-      elements.dailyReminder.classList.remove('show');
-    }
-  }, 5500);
+  renderTodayMission();
+  renderCardStatus();
 }
 
 function handleUnfamiliarModeResult(item, isCorrect) {
@@ -387,6 +367,7 @@ function endCustomSession(completed = false) {
   } else if (modeType === 'unfamiliar') {
     showFeedback('修羅場暫停，隨時再回來收拾不熟題。', false, { flash: false });
   }
+  renderCardStatus();
 }
 
 function updateCustomStats(isCorrect) {
@@ -398,6 +379,7 @@ function updateCustomStats(isCorrect) {
     state.customStats.consecutive = 0;
   }
   renderCustomIndicator();
+  renderCardStatus();
   const accuracy = state.customStats.attempts
     ? state.customStats.correct / state.customStats.attempts
     : 0;
@@ -625,6 +607,8 @@ function renderStageProgress() {
   updateHeroCta();
   ensureActiveFilterAllowed();
   renderModeTabs();
+  renderTodayMission();
+  renderCardStatus();
 }
 
 function updateStageGate(categoryId, isCorrect) {
@@ -808,6 +792,25 @@ function renderVisualOrbit(visual) {
   });
 }
 
+function getCurrentSessionStats() {
+  if (state.mode === 'custom') {
+    return state.customStats;
+  }
+  const stageId = state.stageGate.currentStage;
+  return state.stageGate.stats[stageId] ?? { attempts: 0, correct: 0, consecutive: 0 };
+}
+
+function renderCardStatus() {
+  if (!elements.cardStatus) return;
+  const stats = getCurrentSessionStats();
+  const attempts = stats?.attempts ?? 0;
+  const correct = stats?.correct ?? 0;
+  const accuracy = attempts ? Math.round((correct / attempts) * 100) : 0;
+  const questionNumber = attempts + 1;
+  const todayAttempts = state.dailyProgress.attempts ?? 0;
+  elements.cardStatus.textContent = `第 ${questionNumber} 題｜本輪正確率 ${accuracy}%｜今天已完成 ${todayAttempts} 題`;
+}
+
 function renderCard() {
   const item = state.currentItem;
   const categoryMeta = categories.find((category) => category.id === item.category);
@@ -838,6 +841,7 @@ function renderCard() {
   }
   elements.card?.classList.remove('flash-correct', 'flash-incorrect');
   renderQuestion();
+  renderCardStatus();
 }
 
 function renderQuestion() {
@@ -1058,28 +1062,28 @@ function updateTroubleList() {
 
   if (elements.troubleList) {
     elements.troubleList.innerHTML = '';
-    if (!itemsWithStats.length) {
-      const empty = document.createElement('li');
-      empty.className = 'empty';
-      empty.textContent = '今天的字母都很乖，沒有調皮鬼。';
-      elements.troubleList.appendChild(empty);
-    } else {
-      itemsWithStats.forEach(({ item, stats, accuracy }, index) => {
-        const li = document.createElement('li');
-        li.dataset.rank = index + 1;
-        const percent = Math.round(accuracy * 100);
-        const needed = Math.max(0, 5 - (stats.streak ?? 0));
-        li.innerHTML = `
-          <span class="trouble-glyph">${item.thai}</span>
-          <div class="trouble-meta">
-            <p>錯 ${stats.incorrect ?? 0} 次 · 正確率 ${percent}%</p>
-            <p>還需連對 ${needed} 題就畢業</p>
-          </div>
-        `;
-        li.addEventListener('click', () => startCustomSession([item.id], `${item.thai} 集中練習`));
-        elements.troubleList.appendChild(li);
-      });
+    const hasTrouble = itemsWithStats.length > 0;
+    if (elements.troubleSection) {
+      elements.troubleSection.hidden = !hasTrouble;
     }
+    if (!hasTrouble) {
+      return;
+    }
+    itemsWithStats.forEach(({ item, stats, accuracy }, index) => {
+      const li = document.createElement('li');
+      li.dataset.rank = index + 1;
+      const percent = Math.round(accuracy * 100);
+      const needed = Math.max(0, 5 - (stats.streak ?? 0));
+      li.innerHTML = `
+        <span class="trouble-glyph">${item.thai}</span>
+        <div class="trouble-meta">
+          <p>錯 ${stats.incorrect ?? 0} 次 · 正確率 ${percent}%</p>
+          <p>還需連對 ${needed} 題就畢業</p>
+        </div>
+      `;
+      li.addEventListener('click', () => startCustomSession([item.id], `${item.thai} 集中練習`));
+      elements.troubleList.appendChild(li);
+    });
   }
   renderUnfamiliarPool();
 }
@@ -1245,9 +1249,6 @@ function updateUnfamiliarSummary(count) {
 }
 
 function updateUnfamiliarButtons(hasItems) {
-  if (elements.drillUnfamiliar) {
-    elements.drillUnfamiliar.disabled = !hasItems;
-  }
   if (elements.startUnfamiliarPractice) {
     elements.startUnfamiliarPractice.disabled = !hasItems;
   }
@@ -1274,7 +1275,7 @@ function resetProgress() {
   ensureCurrentItemAllowed();
   updateHeroCta();
   renderCard();
-  renderDailyWidget();
+  renderTodayMission();
 }
 
 elements.playAudio.addEventListener('click', () => speak(state.currentItem));
@@ -1286,10 +1287,6 @@ elements.startAlphabetPractice?.addEventListener('click', () =>
   startCustomSession(Array.from(state.manualUnfamiliar), '字母 / 音標自選練習')
 );
 elements.startUnfamiliarPractice?.addEventListener('click', () => {
-  const ids = gatherUnfamiliarIds();
-  startCustomSession(ids, '修羅場模式', { modeType: 'unfamiliar', snapshotIds: ids });
-});
-elements.drillUnfamiliar?.addEventListener('click', () => {
   const ids = gatherUnfamiliarIds();
   startCustomSession(ids, '修羅場模式', { modeType: 'unfamiliar', snapshotIds: ids });
 });
@@ -1336,5 +1333,4 @@ renderStageProgress();
 ensureCurrentItemAllowed();
 renderCard();
 renderCustomIndicator();
-renderDailyWidget();
-maybeShowDailyReminder();
+renderTodayMission();

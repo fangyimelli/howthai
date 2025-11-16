@@ -72,6 +72,10 @@ button.primary {
 .hero {
   padding: clamp(1.5rem, 4vw, 3rem) clamp(1rem, 7vw, 5rem);
   text-align: left;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  align-items: center;
+  gap: clamp(1rem, 4vw, 3rem);
 }
 
 .hero-text h1 {
@@ -105,6 +109,107 @@ button.primary {
   font-size: 0.95rem;
 }
 
+.hero-art {
+  position: relative;
+  min-height: 260px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hero-device {
+  width: clamp(240px, 28vw, 320px);
+  height: clamp(260px, 32vw, 360px);
+  border-radius: 30px;
+  background: radial-gradient(circle at top, rgba(15, 23, 42, 0.85), rgba(2, 6, 23, 0.85));
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  box-shadow: 0 20px 60px rgba(2, 6, 23, 0.75);
+  padding: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.device-screen {
+  width: 100%;
+  height: 100%;
+  border-radius: 24px;
+  background: linear-gradient(160deg, rgba(99, 102, 241, 0.3), rgba(236, 72, 153, 0.3));
+  border: 1px solid rgba(99, 102, 241, 0.5);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  overflow: hidden;
+}
+
+.device-emoji {
+  font-size: clamp(2.4rem, 4vw, 3.6rem);
+}
+
+.device-script {
+  font-size: clamp(2.2rem, 4vw, 3.2rem);
+  font-weight: 700;
+}
+
+.device-buttons {
+  display: flex;
+  gap: 0.35rem;
+  position: absolute;
+  bottom: 1rem;
+}
+
+.device-buttons span {
+  width: 28px;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(248, 250, 252, 0.2);
+}
+
+.device-wave {
+  position: absolute;
+  width: 160%;
+  height: 160%;
+  background: conic-gradient(from 90deg, rgba(251, 191, 36, 0.35), rgba(59, 130, 246, 0.2));
+  animation: hero-wave 6s ease-in-out infinite;
+  opacity: 0.35;
+}
+
+.hero-floating {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.floating-icon {
+  position: absolute;
+  font-size: 2.2rem;
+  animation: orb-float 5s ease-in-out infinite;
+}
+
+.floating-icon:nth-child(1) {
+  top: 10%;
+  left: 18%;
+}
+
+.floating-icon:nth-child(2) {
+  bottom: 12%;
+  right: 15%;
+  animation-delay: 0.8s;
+}
+
+.floating-icon.floating-main {
+  top: 5%;
+  right: 35%;
+  animation-delay: 0.4s;
+}
+
+.floating-icon.pulse {
+  animation: hero-pop 0.7s ease;
+}
+
 .main-layout {
   padding: 0 clamp(1rem, 7vw, 5rem) clamp(4rem, 8vw, 6rem);
 }
@@ -133,18 +238,49 @@ button.primary {
 }
 
 .card-visual {
-  background: rgba(255, 255, 255, 0.05);
+  position: relative;
+  background: radial-gradient(circle at 20% 20%, rgba(236, 72, 153, 0.35), rgba(15, 23, 42, 0.8));
   border-radius: 22px;
-  min-height: 200px;
+  min-height: 220px;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 3rem;
-  border: 1px dashed var(--border);
+  border: 1px dashed rgba(236, 72, 153, 0.35);
+  overflow: hidden;
+}
+
+.card-visual::after {
+  content: '';
+  position: absolute;
+  inset: 15%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(251, 191, 36, 0.35), transparent 60%);
+  filter: blur(10px);
+  opacity: 0.6;
 }
 
 #visual-symbol {
-  font-size: clamp(3rem, 8vw, 5rem);
+  font-size: clamp(3rem, 7vw, 5.5rem);
+  position: relative;
+  z-index: 1;
+}
+
+.visual-orbit {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+.visual-bubble {
+  position: absolute;
+  font-size: 1.75rem;
+  opacity: 0.65;
+  animation: bubble-float 6s ease-in-out infinite;
+  animation-delay: var(--delay, 0s);
+  left: var(--offset-x, 50%);
+  top: var(--offset-y, 50%);
+  transform: translate(-50%, -50%);
 }
 
 .card-body {
@@ -569,10 +705,12 @@ button.primary {
 
 .card.flash-correct {
   box-shadow: 0 30px 60px rgba(52, 211, 153, 0.35);
+  animation: card-flash-success 0.6s ease;
 }
 
 .card.flash-incorrect {
   box-shadow: 0 30px 60px rgba(248, 113, 113, 0.35);
+  animation: card-flash-fail 0.6s ease;
 }
 
 .mobile-action-bar {
@@ -590,6 +728,87 @@ button.primary {
 
 .mobile-action-bar button {
   flex: 1;
+}
+
+@keyframes hero-wave {
+  0% {
+    transform: rotate(0deg) scale(1);
+  }
+  50% {
+    transform: rotate(12deg) scale(1.1);
+  }
+  100% {
+    transform: rotate(0deg) scale(1);
+  }
+}
+
+@keyframes orb-float {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(5px, -10px, 0);
+  }
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes hero-pop {
+  0% {
+    transform: scale(0.8);
+    opacity: 0.4;
+  }
+  60% {
+    transform: scale(1.1);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes bubble-float {
+  0% {
+    transform: translate(-50%, -50%) scale(0.9);
+  }
+  50% {
+    transform: translate(calc(-50% + 5px), calc(-50% - 8px)) scale(1.1);
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(0.9);
+  }
+}
+
+@keyframes card-flash-success {
+  0% {
+    background: rgba(52, 211, 153, 0.15);
+  }
+  100% {
+    background: transparent;
+  }
+}
+
+@keyframes card-flash-fail {
+  0% {
+    background: rgba(248, 113, 113, 0.15);
+  }
+  100% {
+    background: transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .floating-icon,
+  .visual-bubble,
+  .card.flash-correct,
+  .card.flash-incorrect,
+  .meter-fill,
+  .combo-pop {
+    animation: none !important;
+    transition: none !important;
+  }
 }
 
 @media (max-width: 1024px) {
@@ -617,6 +836,10 @@ button.primary {
 
   .hero {
     text-align: left;
+  }
+
+  .hero-art {
+    display: none;
   }
 }
 

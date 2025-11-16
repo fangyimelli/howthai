@@ -37,6 +37,10 @@ const elements = {
   modeTabs: document.getElementById('mode-tabs'),
   modeTip: document.getElementById('mode-tip'),
   visualSymbol: document.getElementById('visual-symbol'),
+  visualOrbit: document.getElementById('visual-orbit'),
+  heroDeviceEmoji: document.getElementById('hero-device-emoji'),
+  heroDeviceScript: document.getElementById('hero-device-script'),
+  heroFloatingMain: document.getElementById('hero-floating-main'),
   drillUnfamiliar: document.getElementById('drill-unfamiliar')
 };
 
@@ -596,6 +600,37 @@ function speak(item) {
   window.speechSynthesis.speak(utterance);
 }
 
+function renderVisualOrbit(visual) {
+  if (!elements.visualOrbit) return;
+  elements.visualOrbit.innerHTML = '';
+  const icon = visual ?? '✨';
+  const orbitIcons = [icon, '✨', '🎯'];
+  orbitIcons.forEach((emoji, index) => {
+    const bubble = document.createElement('span');
+    bubble.className = 'visual-bubble';
+    bubble.textContent = emoji;
+    bubble.style.setProperty('--offset-x', `${25 + Math.random() * 50}%`);
+    bubble.style.setProperty('--offset-y', `${20 + Math.random() * 55}%`);
+    bubble.style.setProperty('--delay', `${index * 0.25}s`);
+    elements.visualOrbit.appendChild(bubble);
+  });
+}
+
+function syncHeroArt(item) {
+  if (elements.heroDeviceEmoji) {
+    elements.heroDeviceEmoji.textContent = item.visual ?? '🌟';
+  }
+  if (elements.heroDeviceScript) {
+    elements.heroDeviceScript.textContent = item.thai ?? '';
+  }
+  if (elements.heroFloatingMain) {
+    elements.heroFloatingMain.textContent = item.visual ?? '🌟';
+    elements.heroFloatingMain.classList.remove('pulse');
+    void elements.heroFloatingMain.offsetWidth;
+    elements.heroFloatingMain.classList.add('pulse');
+  }
+}
+
 function renderCard() {
   const item = state.currentItem;
   const categoryMeta = categories.find((category) => category.id === item.category);
@@ -605,6 +640,8 @@ function renderCard() {
   if (elements.visualSymbol) {
     elements.visualSymbol.textContent = item.visual ?? '🌟';
   }
+  renderVisualOrbit(item.visual);
+  syncHeroArt(item);
   if (elements.thaiScript) {
     elements.thaiScript.textContent = item.thai;
   }

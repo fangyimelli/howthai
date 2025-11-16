@@ -11,30 +11,4 @@
    npx serve .
    ```
 
-## 免費上線方式
-
-這個專案是純前端應用程式，只需要一個靜態檔案伺服器，因此可以使用多種免費平台。以下列出兩種最簡單的方式。
-
-### 1. GitHub Pages
-1. **建立儲存庫**：在 GitHub 建立新的 repository，將此專案的檔案全部推上去。
-2. **啟用 Pages**：進入 `Settings › Pages`，在「Build and deployment」區塊選擇 `Deploy from a branch`，branch 選擇 `main`，資料夾選 `/(root)`，儲存後等待數十秒。
-3. **取得網址**：GitHub 會在設定頁面顯示公開網址（通常是 `https://<帳號>.github.io/<repo>`），即可分享給使用者。
-4. **維護內容**：之後只要 push 新版程式碼，GitHub Pages 會自動更新。
-
-> 如果需要自訂網域，可在 Pages 設定中加入 CNAME 並在網域 DNS 指向 GitHub。
-
-### 2. Netlify
-1. 註冊 Netlify 帳號並連結 GitHub（或直接拖拉 zip 檔部署）。
-2. 選擇儲存庫後，在部署設定中把 `Base directory` 留空，`Build command` 留空，`Publish directory` 設定為 `.`（因為根目錄就包含 `index.html`）。
-3. 點擊 Deploy，完成後 Netlify 會給一個 `https://<隨機名稱>.netlify.app` 的網址。
-4. 可以在 Netlify 介面內更改網址子域或綁定自己的網域。
-
-### 其他選項
-- **Vercel**：同樣支援直接部署靜態網頁，設定方式與 Netlify 類似。
-- **Cloudflare Pages**：支援無限流量的靜態站台，建立專案後選擇 GitHub repository 並指定 `index.html` 即可。
-
-## 建議流程
-1. 在本機確認內容無誤並 commit。
-2. 推送至 GitHub。
-3. 選擇上述任一免費平台部署。
-4. 分享平台提供的公開網址給使用者即可開始使用。
+測試網址：https://fangyimelli.github.io/howthai/
